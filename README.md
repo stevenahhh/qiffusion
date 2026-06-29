@@ -27,6 +27,10 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m qiffusion.cli qwen-status --out evidence/qwen-status.json
 .\.venv\Scripts\python.exe -m qiffusion.cli qwen-eval --out evidence/qwen-eval.json
 .\.venv\Scripts\python.exe -m qiffusion.cli backend-status --backend diffusion --out evidence/diffusion-status.json
+.\.venv\Scripts\python.exe -m qiffusion.cli diffusion-train --steps 20 --seed 11 --max-examples 24 --out evidence/final-tiny.pt --report-out evidence/final-train.json
+.\.venv\Scripts\python.exe -m qiffusion.cli diffusion-sample --checkpoint evidence/final-tiny.pt --prompt "def" --steps 8 --seed 11 --out evidence/final-sample.json
+.\.venv\Scripts\python.exe -m qiffusion.cli diffusion-eval --checkpoint evidence/final-tiny.pt --runs 1 --out evidence/final-eval.json
+.\.venv\Scripts\python.exe -m qiffusion.cli status --report evidence/final-eval.json
 ```
 
 ## Initial tracks
@@ -45,4 +49,8 @@ This GitHub repository is public. Future completed Codex work in this repo shoul
 `qwen-eval` runs independent local Ollama `qwen3.5:4b` coding tasks, including arithmetic, list, string, interval-merging, small file-editing, and bug-repair checks. Each task asks for Python code, prefers Ollama's `stream: false` HTTP API for clean JSON, parses the response, executes the generated code under narrow smoke tests, and only sets `coding_capability_claim` when every task passes.
 Use `--runs N` to require the full independent-task suite to pass repeatedly in one report.
 
-`backend-status --backend diffusion` writes the current diffusion scaffold report. The scaffold is selectable through the shared gate but is not a training, sampling, chat, or coding-capable implementation yet.
+`diffusion-train` trains a tiny CPU masked-diffusion byte model from deterministic local code data and optional exported teacher JSONL. `diffusion-sample` consumes that checkpoint and writes a JSON sample. `diffusion-eval` consumes the checkpoint, runs code smoke, and writes the shared-gate-compatible report. The tiny diffusion path remains conservative: current reports keep `coding_capability_claim=false` unless generated Python passes executable smoke.
+
+`backend-status --backend diffusion` writes the scaffold report. The scaffold is selectable through the shared gate but is not a chat-capable or coding-capable implementation by itself.
+
+See `docs/diffusion-training.md` for artifact policy, exact commands, and the deferred scaling path.
