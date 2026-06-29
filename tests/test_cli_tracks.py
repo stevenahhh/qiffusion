@@ -4,6 +4,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 from qiffusion.cli import main
 
 
@@ -120,11 +122,44 @@ def test_qwen_eval_promotes_after_fake_ollama_code_passes(
         "count_even",
         "reverse_words",
     }
+    assert {item["run"] for item in report["task_results"]} == {1}
     assert {item["name"] for item in report["fixture_results"]} == {
         "add",
         "count_even",
         "reverse_words",
     }
+
+
+def test_qwen_eval_aggregates_repeated_runs(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    write_fake_ollama(
+        tmp_path,
+        model_list="qwen3.5:4b abc 3.4 GB now",
+        code=(
+            "def add(a, b):\n"
+            "    return a + b\n"
+            "def count_even(values):\n"
+            "    return sum(1 for value in values if value % 2 == 0)\n"
+            "def reverse_words(text):\n"
+            "    return ' '.join(reversed(text.split()))\n"
+        ),
+    )
+    monkeypatch.setenv("PATH", str(tmp_path))
+    monkeypatch.setenv("QIFFUSION_DISABLE_HF", "1")
+    monkeypatch.setenv("QIFFUSION_DISABLE_GGUF", "1")
+    monkeypatch.setenv("QIFFUSION_DISABLE_OLLAMA_HTTP", "1")
+    output = tmp_path / "qwen-eval.json"
+
+    exit_code = main(["qwen-eval", "--runs", "2", "--out", str(output)])
+
+    assert exit_code == 0
+    report = json.loads(output.read_text(encoding="utf-8"))
+    assert report["runs"] == 2
+    assert report["coding_capability_claim"] is True
+    assert len(report["task_results"]) == 6
+    assert {item["run"] for item in report["task_results"]} == {1, 2}
 
 
 def test_qwen_eval_rejects_incomplete_generated_suite(
@@ -171,6 +206,15 @@ def test_qwen_eval_missing_ollama_model_does_not_claim(
     assert report["fixtures_status"] == "not_run"
     assert report["code_smoke_status"] == "not_run"
     assert report["coding_capability_claim"] is False
+
+
+def test_qwen_eval_rejects_empty_run_count(tmp_path: Path) -> None:
+    output = tmp_path / "qwen-eval.json"
+
+    with pytest.raises(SystemExit) as raised:
+        main(["qwen-eval", "--runs", "0", "--out", str(output)])
+
+    assert raised.value.code == 2
 
 
 def test_backend_status_writes_diffusion_scaffold_report(

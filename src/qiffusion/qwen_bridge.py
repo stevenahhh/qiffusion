@@ -26,6 +26,7 @@ class QwenBridgeReport(TypedDict):
     generated_code: NotRequired[str]
     fixture_results: NotRequired[list[FixtureResult]]
     raw_response: NotRequired[str]
+    runs: NotRequired[int]
     smoke_error: NotRequired[str]
     task_results: NotRequired[list[TaskResult]]
 
@@ -38,6 +39,7 @@ class FixtureResult(TypedDict):
 
 class TaskResult(TypedDict):
     name: str
+    run: int
     status: str
     error: NotRequired[str]
     generated_code: NotRequired[str]

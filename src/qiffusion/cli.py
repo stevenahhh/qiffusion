@@ -14,6 +14,13 @@ from qiffusion.qwen_eval import qwen_eval
 JsonValue: TypeAlias = str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
 
 
+def positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("--runs must be at least 1")
+    return parsed
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="qiffusion project control surface.")
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -29,6 +36,7 @@ def build_parser() -> argparse.ArgumentParser:
     qwen_eval_parser = subcommands.add_parser("qwen-eval", help="Run the Qwen bridge coding fixture.")
     qwen_eval_parser.add_argument("--out", type=Path, required=True)
     qwen_eval_parser.add_argument("--model", default=DEFAULT_OLLAMA_MODEL)
+    qwen_eval_parser.add_argument("--runs", type=positive_int, default=1)
 
     backend = subcommands.add_parser("backend-status", help="Write backend scaffold status.")
     backend.add_argument("--backend", choices=("diffusion",), required=True)
@@ -67,7 +75,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps(report, sort_keys=True))
         return 0
     if args.command == "qwen-eval":
-        report = qwen_eval(args.model)
+        report = qwen_eval(args.model, args.runs)
         write_json(args.out, report)
         print(json.dumps(report, sort_keys=True))
         return 0 if report["status"] == "available" else 2

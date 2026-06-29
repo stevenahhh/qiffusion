@@ -33,6 +33,7 @@ class EvalProgress:
 @dataclass(frozen=True, slots=True)
 class TaskFailure:
     task: CodingTask
+    run: int
     statuses: tuple[str, str]
     message: str
 
@@ -121,7 +122,7 @@ def extract_code(response: str) -> tuple[bool, str]:
     return (True, code)
 
 
-def qwen_eval(model: str = DEFAULT_OLLAMA_MODEL) -> QwenBridgeReport:
+def qwen_eval(model: str = DEFAULT_OLLAMA_MODEL, runs: int = 1) -> QwenBridgeReport:
     if not ollama_has_qwen(model):
         return {
             "backend": "qwen_bridge",
@@ -133,28 +134,30 @@ def qwen_eval(model: str = DEFAULT_OLLAMA_MODEL) -> QwenBridgeReport:
             "code_smoke_status": "not_run",
             "candidate_source": "none",
             "coding_capability_claim": False,
+            "runs": runs,
         }
     task_results: list[TaskResult] = []
     generated: list[str] = []
     fixture_results = []
-    for task in CODING_TASKS:
-        ok, response = run_ollama_fixture(model, task_prompt(task))
-        if not ok:
-            return task_failure(progress(model, task_results, generated), TaskFailure(task, ("fail", "not_run"), response))
-        parsed, code = extract_code(response)
-        if not parsed:
-            report = task_failure(progress(model, task_results, generated), TaskFailure(task, ("fail", "not_run"), code))
-            report["raw_response"] = response
-            return report
-        generated.append(f"# {task.name}\n{code}")
-        smoke_ok, smoke_message, task_fixtures = run_task_smoke(code, task)
-        fixture_results.extend(task_fixtures)
-        if not smoke_ok:
-            return task_failure(
-                progress(model, task_results, generated),
-                TaskFailure(task, ("pass", "fail"), smoke_message),
-            )
-        task_results.append({"name": task.name, "status": "pass", "generated_code": code})
+    for run_number in range(1, runs + 1):
+        for task in CODING_TASKS:
+            ok, response = run_ollama_fixture(model, task_prompt(task))
+            if not ok:
+                failure = TaskFailure(task, run_number, ("fail", "not_run"), response)
+                return task_failure(progress(model, task_results, generated), failure)
+            parsed, code = extract_code(response)
+            if not parsed:
+                failure = TaskFailure(task, run_number, ("fail", "not_run"), code)
+                report = task_failure(progress(model, task_results, generated), failure)
+                report["raw_response"] = response
+                return report
+            generated.append(f"# run {run_number} {task.name}\n{code}")
+            smoke_ok, smoke_message, task_fixtures = run_task_smoke(code, task)
+            fixture_results.extend(task_fixtures)
+            if not smoke_ok:
+                failure = TaskFailure(task, run_number, ("pass", "fail"), smoke_message)
+                return task_failure(progress(model, task_results, generated), failure)
+            task_results.append({"name": task.name, "run": run_number, "status": "pass", "generated_code": code})
     return {
         "backend": "qwen_bridge",
         "model_id": PREFERRED_MODEL_ID,
@@ -167,6 +170,7 @@ def qwen_eval(model: str = DEFAULT_OLLAMA_MODEL) -> QwenBridgeReport:
         "coding_capability_claim": True,
         "fixture_results": fixture_results,
         "generated_code": "\n\n".join(generated),
+        "runs": runs,
         "task_results": task_results,
     }
 
@@ -177,7 +181,10 @@ def progress(model: str, task_results: list[TaskResult], generated: list[str]) -
 
 def task_failure(progress: EvalProgress, failure: TaskFailure) -> QwenBridgeReport:
     fixtures_status, code_smoke_status = failure.statuses
-    task_results = [*progress.task_results, {"name": failure.task.name, "status": "fail", "error": failure.message}]
+    task_results = [
+        *progress.task_results,
+        {"name": failure.task.name, "run": failure.run, "status": "fail", "error": failure.message},
+    ]
     report = eval_failure(progress.model, fixtures_status, code_smoke_status, failure.message)
     report["generated_code"] = "\n\n".join(progress.generated)
     report["task_results"] = task_results
