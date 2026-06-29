@@ -11,4 +11,4 @@ evidence/
 checkpoints/
 models/
 .env
-
+.omo/

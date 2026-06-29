@@ -3,7 +3,10 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TypeAlias
+
+JsonValue: TypeAlias = str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
+JsonObject: TypeAlias = dict[str, JsonValue]
 
 
 @dataclass(frozen=True, slots=True)
@@ -12,14 +15,14 @@ class GateDecision:
     reason: str
 
 
-def load_json(path: Path) -> dict[str, Any]:
+def load_json(path: Path) -> JsonObject:
     data = json.loads(path.read_text(encoding="utf-8-sig"))
     if not isinstance(data, dict):
         raise ValueError(f"{path}: expected JSON object")
     return data
 
 
-def decide_coding_capable(report: dict[str, Any]) -> GateDecision:
+def decide_coding_capable(report: JsonObject) -> GateDecision:
     candidate = report.get("best") if isinstance(report.get("best"), dict) else report
     if candidate.get("fixtures_status") != "pass":
         return GateDecision("continue", "fixtures are not passing")

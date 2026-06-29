@@ -24,6 +24,8 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e .[dev]
 .\.venv\Scripts\python.exe -m pytest
 .\.venv\Scripts\python.exe -m qiffusion.cli plan
+.\.venv\Scripts\python.exe -m qiffusion.cli qwen-status --out evidence/qwen-status.json
+.\.venv\Scripts\python.exe -m qiffusion.cli backend-status --backend diffusion --out evidence/diffusion-status.json
 ```
 
 ## Initial tracks
@@ -31,3 +33,12 @@ python -m venv .venv
 - `diffusion`: native diffusion LLM training and sampling loop.
 - `qwen_bridge`: Qwen/Qwen3.5-4B local baseline, teacher output generation, and code smoke comparison.
 
+## Publishing Workflow
+
+This GitHub repository is public. Future completed Codex work in this repo should be verified, committed, and pushed automatically to the configured remote. Repository visibility changes remain an owner-level operation and are not part of feature workers.
+
+## Current CLI Surfaces
+
+`qwen-status` checks for a local Qwen/Qwen3.5-4B bridge engine and writes a JSON report. It may return `prerequisite_missing` without failing; discovery is not a coding-capability claim.
+
+`backend-status --backend diffusion` writes the current diffusion scaffold report. The scaffold is selectable through the shared gate but is not a training, sampling, chat, or coding-capable implementation yet.

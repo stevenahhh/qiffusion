@@ -20,15 +20,30 @@ The shared coding-capable gate requires:
 
 ## Near-term loop
 
-1. Import the current ELF diffusion prototype as the first `diffusion` backend.
-2. Import the current Qwen probe and benchmark as the first `qwen_bridge` backend.
-3. Add a shared evidence schema for loop summaries.
-4. Run both backends against the same code smoke fixture.
-5. Promote only the backend that passes the shared gate.
+1. Stabilize the `qwen_bridge` status and prerequisite surface.
+2. Import the current Qwen probe and benchmark as the first executable `qwen_bridge` backend.
+3. Register the diffusion scaffold through the same status and gate surface.
+4. Import the current ELF diffusion prototype as the first `diffusion` backend.
+5. Add a shared evidence schema for loop summaries.
+6. Run both backends against the same code smoke fixture.
+7. Promote only the backend that passes the shared gate.
+
+## Current Commands
+
+```powershell
+python -m qiffusion.cli qwen-status --out evidence/qwen-status.json
+python -m qiffusion.cli backend-status --backend diffusion --out evidence/diffusion-status.json
+python -m qiffusion.cli status --report evidence/qwen-status.json
+```
+
+`qwen-status` may report `prerequisite_missing`; that means no local bridge engine was found and no download was attempted. `backend-status --backend diffusion` reports the diffusion scaffold only. Neither command claims coding capability.
+
+## Publishing Workflow
+
+The repository is public. Completed work should be verified, committed, and pushed automatically. Feature work should not change repository visibility.
 
 ## Non-goals
 
 - Do not claim chat or coding capability from sample text quality alone.
 - Do not hide Qwen fallback inside diffusion results.
 - Do not tune for one hard-coded fixture without recording that limitation.
-
