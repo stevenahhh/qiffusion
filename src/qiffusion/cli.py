@@ -19,7 +19,7 @@ JsonValue: TypeAlias = str | int | float | bool | None | list["JsonValue"] | dic
 def positive_int(value: str) -> int:
     parsed = int(value)
     if parsed < 1:
-        raise argparse.ArgumentTypeError("--runs must be at least 1")
+        raise argparse.ArgumentTypeError("value must be at least 1")
     return parsed
 
 
@@ -46,6 +46,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     diffusion_train = subcommands.add_parser("diffusion-train", help="Write a non-claiming diffusion train stub report.")
     diffusion_train.add_argument("--report-out", type=Path, required=True)
+    diffusion_train.add_argument("--out", type=Path)
+    diffusion_train.add_argument("--steps", type=positive_int, default=20)
+    diffusion_train.add_argument("--seed", type=int, default=1)
+    diffusion_train.add_argument("--max-examples", type=positive_int, default=24)
+    diffusion_train.add_argument("--teacher-jsonl", type=Path, action="append", default=())
 
     diffusion_sample = subcommands.add_parser("diffusion-sample", help="Write a non-claiming diffusion sample stub report.")
     diffusion_sample.add_argument("--report-out", type=Path, required=True)
@@ -100,6 +105,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps(report, sort_keys=True))
         return 0
     if args.command == "diffusion-train":
+        if args.out is not None:
+            from qiffusion.diffusion_train import DiffusionTrainConfig, train_tiny_diffusion
+
+            report = train_tiny_diffusion(
+                DiffusionTrainConfig(
+                    checkpoint_path=args.out,
+                    steps=args.steps,
+                    seed=args.seed,
+                    max_examples=args.max_examples,
+                    teacher_jsonl_paths=tuple(args.teacher_jsonl),
+                )
+            )
+            write_json(args.report_out, report)
+            print(json.dumps(report, sort_keys=True))
+            return 0
         report = diffusion_stub_report("train")
         write_json(args.report_out, report)
         print(json.dumps(report, sort_keys=True))
