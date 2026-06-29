@@ -52,8 +52,13 @@ def build_parser() -> argparse.ArgumentParser:
     diffusion_train.add_argument("--max-examples", type=positive_int, default=24)
     diffusion_train.add_argument("--teacher-jsonl", type=Path, action="append", default=())
 
-    diffusion_sample = subcommands.add_parser("diffusion-sample", help="Write a non-claiming diffusion sample stub report.")
-    diffusion_sample.add_argument("--report-out", type=Path, required=True)
+    diffusion_sample = subcommands.add_parser("diffusion-sample", help="Write a non-claiming diffusion sample report.")
+    diffusion_sample.add_argument("--report-out", type=Path)
+    diffusion_sample.add_argument("--checkpoint", type=Path)
+    diffusion_sample.add_argument("--prompt", default="")
+    diffusion_sample.add_argument("--steps", type=positive_int, default=8)
+    diffusion_sample.add_argument("--seed", type=int, default=1)
+    diffusion_sample.add_argument("--out", type=Path)
 
     diffusion_eval = subcommands.add_parser("diffusion-eval", help="Write a non-claiming diffusion eval stub report.")
     diffusion_eval.add_argument("--report-out", type=Path, required=True)
@@ -125,6 +130,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps(report, sort_keys=True))
         return 0
     if args.command == "diffusion-sample":
+        if args.checkpoint is not None and args.out is not None:
+            from qiffusion.diffusion_sample import DiffusionSampleConfig, sample_from_checkpoint
+
+            report = sample_from_checkpoint(
+                DiffusionSampleConfig(
+                    checkpoint_path=args.checkpoint,
+                    prompt=args.prompt,
+                    steps=args.steps,
+                    seed=args.seed,
+                )
+            )
+            write_json(args.out, report)
+            print(json.dumps(report, sort_keys=True))
+            return 0
         report = diffusion_stub_report("sample")
         write_json(args.report_out, report)
         print(json.dumps(report, sort_keys=True))
