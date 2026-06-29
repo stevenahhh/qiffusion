@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+from dataclasses import dataclass
+from importlib import metadata, util
 from pathlib import Path
 from typing import Final, Literal, TypedDict
 
@@ -22,6 +24,12 @@ class QwenBridgeReport(TypedDict):
     coding_capability_claim: bool
 
 
+@dataclass(frozen=True, slots=True)
+class Readiness:
+    available: bool
+    notes: tuple[str, ...]
+
+
 def hf_cache_roots() -> tuple[Path, ...]:
     configured = os.environ.get("QIFFUSION_HF_HOME")
     roots: list[Path] = []
@@ -35,15 +43,53 @@ def hf_cache_roots() -> tuple[Path, ...]:
     return tuple(dict.fromkeys(roots))
 
 
-def has_hf_snapshot(model_id: str) -> bool:
+def discover_hf_snapshot(model_id: str) -> Readiness:
     if os.environ.get("QIFFUSION_DISABLE_HF") == "1":
-        return False
+        return Readiness(False, ())
     cache_name = "models--" + model_id.replace("/", "--")
+    notes: list[str] = []
     for root in hf_cache_roots():
         snapshots = root / cache_name / "snapshots"
-        if snapshots.is_dir() and any((path / "config.json").is_file() for path in snapshots.iterdir()):
-            return True
-    return False
+        if not snapshots.is_dir():
+            continue
+        for snapshot in snapshots.iterdir():
+            if snapshot_is_complete(snapshot):
+                return Readiness(True, ("local Hugging Face snapshot found",))
+            if snapshot.is_dir():
+                notes.append(f"local Hugging Face snapshot incomplete: {snapshot.name}")
+    return Readiness(False, tuple(notes))
+
+
+def snapshot_is_complete(snapshot: Path) -> bool:
+    required = ("config.json", "tokenizer.json")
+    if not snapshot.is_dir():
+        return False
+    if not all((snapshot / name).is_file() and (snapshot / name).stat().st_size > 0 for name in required):
+        return False
+    weights = tuple(snapshot.glob("*.safetensors")) + tuple(snapshot.glob("*.bin"))
+    return any(path.is_file() and path.stat().st_size > 0 for path in weights)
+
+
+def has_hf_snapshot(model_id: str) -> bool:
+    return discover_hf_snapshot(model_id).available
+
+
+def runtime_is_ready() -> Readiness:
+    if util.find_spec("transformers") is None:
+        return Readiness(False, ("transformers is not installed",))
+    if util.find_spec("torch") is None:
+        return Readiness(False, ("torch is not installed",))
+    torch_version = metadata.version("torch")
+    if version_key(torch_version) < (2, 4):
+        return Readiness(False, (f"torch {torch_version} is below required 2.4",))
+    return Readiness(True, ("transformers runtime is ready",))
+
+
+def version_key(value: str) -> tuple[int, int]:
+    parts = value.split("+", maxsplit=1)[0].split(".")
+    major = int(parts[0]) if len(parts) > 0 else 0
+    minor = int(parts[1]) if len(parts) > 1 else 0
+    return (major, minor)
 
 
 def ollama_has_qwen() -> bool:
@@ -65,13 +111,10 @@ def ollama_has_qwen() -> bool:
 def gguf_roots() -> tuple[Path, ...]:
     if os.environ.get("QIFFUSION_DISABLE_GGUF") == "1":
         return ()
-    home = Path.home()
-    return (
-        Path.cwd(),
-        home / ".cache" / "huggingface" / "hub",
-        home / ".cache" / "lm-studio" / "models",
-        home / ".lmstudio" / "models",
-    )
+    configured = os.environ.get("QIFFUSION_GGUF_ROOTS")
+    if configured is None or configured == "":
+        return (Path.cwd(),)
+    return tuple(Path(root) for root in configured.split(os.pathsep) if root != "")
 
 
 def has_qwen_gguf() -> bool:
@@ -90,13 +133,15 @@ def has_qwen_gguf() -> bool:
 
 
 def qwen_status() -> QwenBridgeReport:
-    if has_hf_snapshot(PREFERRED_MODEL_ID):
+    hf = discover_hf_snapshot(PREFERRED_MODEL_ID)
+    runtime = runtime_is_ready()
+    if hf.available and runtime.available:
         return {
             "backend": "qwen_bridge",
             "model_id": PREFERRED_MODEL_ID,
             "status": "available",
             "engine": "transformers",
-            "notes": ["local Hugging Face snapshot found"],
+            "notes": [*hf.notes, *runtime.notes],
             "fixtures_status": "not_run",
             "code_smoke_status": "not_run",
             "candidate_source": "none",
@@ -131,7 +176,7 @@ def qwen_status() -> QwenBridgeReport:
         "model_id": PREFERRED_MODEL_ID,
         "status": "prerequisite_missing",
         "engine": None,
-        "notes": ["no local Qwen 4B engine found; no download attempted"],
+        "notes": [*hf.notes, *runtime.notes, "no runnable local Qwen 4B engine found; no download attempted"],
         "fixtures_status": "not_run",
         "code_smoke_status": "not_run",
         "candidate_source": "none",

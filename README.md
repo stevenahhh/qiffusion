@@ -39,6 +39,6 @@ This GitHub repository is public. Future completed Codex work in this repo shoul
 
 ## Current CLI Surfaces
 
-`qwen-status` checks for a local Qwen/Qwen3.5-4B bridge engine and writes a JSON report. It may return `prerequisite_missing` without failing; discovery is not a coding-capability claim.
+`qwen-status` checks for a runnable local Qwen/Qwen3.5-4B bridge engine and writes a JSON report. A Hugging Face snapshot must have non-empty metadata and weights, and the local `transformers` runtime must be usable. It may return `prerequisite_missing` without failing; discovery is not a coding-capability claim. GGUF fallback scans the current directory by default; set `QIFFUSION_GGUF_ROOTS` to opt into additional roots.
 
 `backend-status --backend diffusion` writes the current diffusion scaffold report. The scaffold is selectable through the shared gate but is not a training, sampling, chat, or coding-capable implementation yet.

@@ -29,6 +29,31 @@ def test_qwen_status_writes_prerequisite_report_when_no_engine(
     assert report["coding_capability_claim"] is False
 
 
+def test_qwen_status_rejects_incomplete_hf_snapshot(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    snapshot = tmp_path / "hf" / "models--Qwen--Qwen3.5-4B" / "snapshots" / "bad"
+    snapshot.mkdir(parents=True)
+    for name in ("config.json", "tokenizer.json", "model.safetensors"):
+        (snapshot / name).write_text("", encoding="utf-8")
+    monkeypatch.setenv("QIFFUSION_HF_HOME", str(tmp_path / "hf"))
+    monkeypatch.delenv("HF_HUB_CACHE", raising=False)
+    monkeypatch.delenv("TRANSFORMERS_CACHE", raising=False)
+    monkeypatch.setenv("USERPROFILE", str(tmp_path / "home"))
+    monkeypatch.setenv("QIFFUSION_DISABLE_OLLAMA", "1")
+    monkeypatch.setenv("QIFFUSION_DISABLE_GGUF", "1")
+    output = tmp_path / "qwen.json"
+
+    exit_code = main(["qwen-status", "--out", str(output)])
+
+    assert exit_code == 0
+    report = json.loads(output.read_text(encoding="utf-8"))
+    assert report["status"] == "prerequisite_missing"
+    assert "incomplete" in " ".join(report["notes"])
+    assert report["coding_capability_claim"] is False
+
+
 def test_backend_status_writes_diffusion_scaffold_report(
     tmp_path: Path,
     capsys,
