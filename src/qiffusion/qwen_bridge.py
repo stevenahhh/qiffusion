@@ -24,9 +24,23 @@ class QwenBridgeReport(TypedDict):
     candidate_source: str
     coding_capability_claim: bool
     generated_code: NotRequired[str]
-    fixture_results: NotRequired[list[dict[str, str]]]
+    fixture_results: NotRequired[list[FixtureResult]]
     raw_response: NotRequired[str]
     smoke_error: NotRequired[str]
+    task_results: NotRequired[list[TaskResult]]
+
+
+class FixtureResult(TypedDict):
+    name: str
+    status: str
+    error: NotRequired[str]
+
+
+class TaskResult(TypedDict):
+    name: str
+    status: str
+    error: NotRequired[str]
+    generated_code: NotRequired[str]
 
 
 @dataclass(frozen=True, slots=True)

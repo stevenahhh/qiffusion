@@ -115,6 +115,11 @@ def test_qwen_eval_promotes_after_fake_ollama_code_passes(
     assert report["code_smoke_status"] == "pass"
     assert report["candidate_source"] == "ollama:qwen3.5:4b"
     assert report["coding_capability_claim"] is True
+    assert {item["name"] for item in report["task_results"]} == {
+        "add",
+        "count_even",
+        "reverse_words",
+    }
     assert {item["name"] for item in report["fixture_results"]} == {
         "add",
         "count_even",
@@ -144,6 +149,7 @@ def test_qwen_eval_rejects_incomplete_generated_suite(
     assert report["fixtures_status"] == "pass"
     assert report["code_smoke_status"] == "fail"
     assert report["coding_capability_claim"] is False
+    assert any(item["name"] == "count_even" and item["status"] == "fail" for item in report["task_results"])
     assert "count_even" in report["smoke_error"]
 
 
