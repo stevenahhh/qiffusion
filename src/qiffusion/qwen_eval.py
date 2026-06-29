@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 import subprocess
+import urllib.error
+import urllib.request
+from dataclasses import dataclass
 from types import FunctionType
-from typing import Final
+from typing import Final, NotRequired, TypedDict
 
 from qiffusion.qwen_bridge import (
     DEFAULT_OLLAMA_MODEL,
@@ -16,15 +20,46 @@ from qiffusion.qwen_bridge import (
 
 CODING_FIXTURE_PROMPT: Final = (
     "Return JSON only with one key named code. The code value must be Python source. "
-    "It must define exactly this function: def add(a, b): return a + b. "
-    "Do not use markdown, JavaScript, explanations, or tests."
+    "Define exactly these Python functions and no imports: "
+    "add(a, b) returns a + b; "
+    "count_even(values) returns the number of even integers in values; "
+    "reverse_words(text) returns the whitespace-separated words in reverse order joined by single spaces. "
+    "Examples: count_even([1, 2, 4, 5]) == 2; reverse_words('one two three') == 'three two one'. "
+    "Do not print, import, use markdown, JavaScript, explanations, or tests."
 )
 
 
+class FixtureResult(TypedDict):
+    name: str
+    status: str
+    error: NotRequired[str]
+
+
+@dataclass(frozen=True, slots=True)
+class FixtureCase:
+    name: str
+    args: tuple[object, ...]
+    expected: object
+
+
+FIXTURE_CASES: Final = (
+    FixtureCase("add", (2, 3), 5),
+    FixtureCase("add", (-1, 4), 3),
+    FixtureCase("count_even", ([1, 2, 4, 5],), 2),
+    FixtureCase("count_even", ([],), 0),
+    FixtureCase("reverse_words", ("one two three",), "three two one"),
+    FixtureCase("reverse_words", ("  solo ",), "solo"),
+)
+REQUIRED_FUNCTIONS: Final = tuple(dict.fromkeys(case.name for case in FIXTURE_CASES))
+
+
 def run_ollama_fixture(model: str) -> tuple[bool, str]:
+    http_ok, http_response = run_ollama_http_fixture(model)
+    if http_ok:
+        return (True, http_response)
     executable = ollama_executable()
     if executable is None:
-        return (False, "ollama executable not found")
+        return (False, http_response)
     command = [
         executable,
         "run",
@@ -55,6 +90,35 @@ def run_ollama_fixture(model: str) -> tuple[bool, str]:
     return (True, result.stdout)
 
 
+def run_ollama_http_fixture(model: str) -> tuple[bool, str]:
+    if os.environ.get("QIFFUSION_DISABLE_OLLAMA_HTTP") == "1":
+        return (False, "ollama HTTP disabled")
+    host = os.environ.get("QIFFUSION_OLLAMA_HOST", "http://127.0.0.1:11434").rstrip("/")
+    payload = json.dumps(
+        {
+            "model": model,
+            "prompt": CODING_FIXTURE_PROMPT,
+            "stream": False,
+            "format": "json",
+            "think": False,
+        }
+    ).encode("utf-8")
+    request = urllib.request.Request(
+        f"{host}/api/generate",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=120.0) as response:
+            body = json.loads(response.read().decode("utf-8"))
+    except (OSError, TimeoutError, json.JSONDecodeError, urllib.error.URLError) as exc:
+        return (False, f"ollama HTTP failed: {exc}")
+    generated = body.get("response") if isinstance(body, dict) else None
+    if not isinstance(generated, str) or generated == "":
+        return (False, "ollama HTTP response lacked generated text")
+    return (True, generated)
+
+
 def extract_code(response: str) -> tuple[bool, str]:
     start = response.find("{")
     end = response.rfind("}")
@@ -72,42 +136,49 @@ def extract_code(response: str) -> tuple[bool, str]:
     return (True, code)
 
 
-def run_code_smoke(code: str) -> tuple[bool, str]:
+def run_code_smoke(code: str) -> tuple[bool, str, list[FixtureResult]]:
     try:
         tree = ast.parse(code)
     except SyntaxError as exc:
-        return (False, f"generated code is not Python: {exc.msg}")
-    allowed = (
-        ast.Module,
-        ast.FunctionDef,
-        ast.arguments,
-        ast.arg,
-        ast.Return,
-        ast.BinOp,
-        ast.Add,
-        ast.Name,
-        ast.Load,
-    )
-    if any(not isinstance(node, allowed) for node in ast.walk(tree)):
-        return (False, "generated code uses unsupported syntax for the smoke fixture")
-    functions = [node for node in tree.body if isinstance(node, ast.FunctionDef)]
-    if len(functions) != 1 or functions[0].name != "add":
-        return (False, "generated code must define exactly one add function")
-    namespace: dict[str, object] = {"__builtins__": {}}
+        return (False, f"generated code is not Python: {exc.msg}", [])
+    blocked = (ast.Import, ast.ImportFrom, ast.Global, ast.Nonlocal)
+    if any(isinstance(node, blocked) for node in ast.walk(tree)):
+        return (False, "generated code uses blocked syntax for the smoke fixture", [])
+    namespace: dict[str, object] = {
+        "__builtins__": {
+            "int": int,
+            "isinstance": isinstance,
+            "len": len,
+            "list": list,
+            "range": range,
+            "reversed": reversed,
+            "str": str,
+            "sum": sum,
+        }
+    }
     try:
         exec(compile(tree, "<qwen-fixture>", "exec"), namespace)
     except Exception as exc:
-        return (False, f"generated code raised during load: {exc}")
-    candidate = namespace.get("add")
-    if not isinstance(candidate, FunctionType):
-        return (False, "add is not a function")
-    try:
-        checks = (candidate(2, 3) == 5, candidate(-1, 4) == 3)
-    except Exception as exc:
-        return (False, f"add raised during smoke check: {exc}")
-    if not all(checks):
-        return (False, "add returned an incorrect result")
-    return (True, "code smoke passed")
+        return (False, f"generated code raised during load: {exc}", [])
+    missing = [name for name in REQUIRED_FUNCTIONS if not isinstance(namespace.get(name), FunctionType)]
+    if missing:
+        return (False, f"generated code is missing functions: {', '.join(missing)}", [])
+    results: list[FixtureResult] = []
+    for case in FIXTURE_CASES:
+        candidate = namespace[case.name]
+        if not isinstance(candidate, FunctionType):
+            return (False, f"{case.name} is not a function", results)
+        try:
+            observed = candidate(*case.args)
+        except Exception as exc:
+            results.append({"name": case.name, "status": "fail", "error": str(exc)})
+            return (False, f"{case.name} raised during smoke check: {exc}", results)
+        if observed != case.expected:
+            error = f"expected {case.expected!r}, got {observed!r}"
+            results.append({"name": case.name, "status": "fail", "error": error})
+            return (False, f"{case.name} returned an incorrect result: {error}", results)
+        results.append({"name": case.name, "status": "pass"})
+    return (True, "code smoke passed", results)
 
 
 def qwen_eval(model: str = DEFAULT_OLLAMA_MODEL) -> QwenBridgeReport:
@@ -131,10 +202,11 @@ def qwen_eval(model: str = DEFAULT_OLLAMA_MODEL) -> QwenBridgeReport:
         report = eval_failure(model, "fail", "not_run", code)
         report["raw_response"] = response
         return report
-    smoke_ok, smoke_message = run_code_smoke(code)
+    smoke_ok, smoke_message, fixture_results = run_code_smoke(code)
     if not smoke_ok:
         report = eval_failure(model, "pass", "fail", smoke_message)
         report["generated_code"] = code
+        report["fixture_results"] = fixture_results
         return report
     return {
         "backend": "qwen_bridge",
@@ -146,6 +218,7 @@ def qwen_eval(model: str = DEFAULT_OLLAMA_MODEL) -> QwenBridgeReport:
         "code_smoke_status": "pass",
         "candidate_source": f"ollama:{model}",
         "coding_capability_claim": True,
+        "fixture_results": fixture_results,
         "generated_code": code,
     }
 

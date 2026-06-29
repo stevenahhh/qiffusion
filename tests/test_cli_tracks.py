@@ -90,11 +90,19 @@ def test_qwen_eval_promotes_after_fake_ollama_code_passes(
     write_fake_ollama(
         tmp_path,
         model_list="qwen3.5:4b abc 3.4 GB now",
-        code="def add(a, b):\n    return a + b\n",
+        code=(
+            "def add(a, b):\n"
+            "    return a + b\n"
+            "def count_even(values):\n"
+            "    return sum(1 for value in values if value % 2 == 0)\n"
+            "def reverse_words(text):\n"
+            "    return ' '.join(reversed(text.split()))\n"
+        ),
     )
     monkeypatch.setenv("PATH", str(tmp_path))
     monkeypatch.setenv("QIFFUSION_DISABLE_HF", "1")
     monkeypatch.setenv("QIFFUSION_DISABLE_GGUF", "1")
+    monkeypatch.setenv("QIFFUSION_DISABLE_OLLAMA_HTTP", "1")
     output = tmp_path / "qwen-eval.json"
 
     exit_code = main(["qwen-eval", "--out", str(output)])
@@ -107,6 +115,36 @@ def test_qwen_eval_promotes_after_fake_ollama_code_passes(
     assert report["code_smoke_status"] == "pass"
     assert report["candidate_source"] == "ollama:qwen3.5:4b"
     assert report["coding_capability_claim"] is True
+    assert {item["name"] for item in report["fixture_results"]} == {
+        "add",
+        "count_even",
+        "reverse_words",
+    }
+
+
+def test_qwen_eval_rejects_incomplete_generated_suite(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    write_fake_ollama(
+        tmp_path,
+        model_list="qwen3.5:4b abc 3.4 GB now",
+        code="def add(a, b):\n    return a + b\n",
+    )
+    monkeypatch.setenv("PATH", str(tmp_path))
+    monkeypatch.setenv("QIFFUSION_DISABLE_HF", "1")
+    monkeypatch.setenv("QIFFUSION_DISABLE_GGUF", "1")
+    monkeypatch.setenv("QIFFUSION_DISABLE_OLLAMA_HTTP", "1")
+    output = tmp_path / "qwen-eval.json"
+
+    exit_code = main(["qwen-eval", "--out", str(output)])
+
+    assert exit_code == 0
+    report = json.loads(output.read_text(encoding="utf-8"))
+    assert report["fixtures_status"] == "pass"
+    assert report["code_smoke_status"] == "fail"
+    assert report["coding_capability_claim"] is False
+    assert "count_even" in report["smoke_error"]
 
 
 def test_qwen_eval_missing_ollama_model_does_not_claim(

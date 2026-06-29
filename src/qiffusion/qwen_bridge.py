@@ -24,6 +24,7 @@ class QwenBridgeReport(TypedDict):
     candidate_source: str
     coding_capability_claim: bool
     generated_code: NotRequired[str]
+    fixture_results: NotRequired[list[dict[str, str]]]
     raw_response: NotRequired[str]
     smoke_error: NotRequired[str]
 
