@@ -8,7 +8,8 @@ from typing import Sequence, TypeAlias
 from qiffusion.backends import diffusion_status
 from qiffusion.config import CODING_CAPABLE_REQUIREMENTS, TRACKS
 from qiffusion.decision import decide_from_file
-from qiffusion.qwen_bridge import qwen_status
+from qiffusion.qwen_bridge import DEFAULT_OLLAMA_MODEL, qwen_status
+from qiffusion.qwen_eval import qwen_eval
 
 JsonValue: TypeAlias = str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
 
@@ -24,6 +25,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     qwen = subcommands.add_parser("qwen-status", help="Write Qwen bridge availability status.")
     qwen.add_argument("--out", type=Path, required=True)
+
+    qwen_eval_parser = subcommands.add_parser("qwen-eval", help="Run the Qwen bridge coding fixture.")
+    qwen_eval_parser.add_argument("--out", type=Path, required=True)
+    qwen_eval_parser.add_argument("--model", default=DEFAULT_OLLAMA_MODEL)
 
     backend = subcommands.add_parser("backend-status", help="Write backend scaffold status.")
     backend.add_argument("--backend", choices=("diffusion",), required=True)
@@ -61,6 +66,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         write_json(args.out, report)
         print(json.dumps(report, sort_keys=True))
         return 0
+    if args.command == "qwen-eval":
+        report = qwen_eval(args.model)
+        write_json(args.out, report)
+        print(json.dumps(report, sort_keys=True))
+        return 0 if report["status"] == "available" else 2
     if args.command == "backend-status":
         report = diffusion_status()
         write_json(args.out, report)

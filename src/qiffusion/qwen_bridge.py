@@ -6,9 +6,10 @@ import subprocess
 from dataclasses import dataclass
 from importlib import metadata, util
 from pathlib import Path
-from typing import Final, Literal, TypedDict
+from typing import Final, Literal, NotRequired, TypedDict
 
 PREFERRED_MODEL_ID: Final = "Qwen/Qwen3.5-4B"
+DEFAULT_OLLAMA_MODEL: Final = "qwen3.5:4b"
 Status = Literal["available", "prerequisite_missing"]
 
 
@@ -22,6 +23,9 @@ class QwenBridgeReport(TypedDict):
     code_smoke_status: str
     candidate_source: str
     coding_capability_claim: bool
+    generated_code: NotRequired[str]
+    raw_response: NotRequired[str]
+    smoke_error: NotRequired[str]
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,20 +96,35 @@ def version_key(value: str) -> tuple[int, int]:
     return (major, minor)
 
 
-def ollama_has_qwen() -> bool:
+def ollama_executable() -> str | None:
+    configured = os.environ.get("QIFFUSION_OLLAMA_BIN")
+    if configured is not None and configured != "":
+        return configured
+    return shutil.which("ollama")
+
+
+def ollama_has_qwen(model: str = DEFAULT_OLLAMA_MODEL) -> bool:
     if os.environ.get("QIFFUSION_DISABLE_OLLAMA") == "1":
         return False
-    executable = shutil.which("ollama")
+    executable = ollama_executable()
     if executable is None:
         return False
     try:
-        result = subprocess.run([executable, "list"], text=True, capture_output=True, timeout=10.0, check=False)
+        result = subprocess.run(
+            [executable, "list"],
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            capture_output=True,
+            timeout=10.0,
+            check=False,
+        )
     except (OSError, subprocess.TimeoutExpired):
         return False
     if result.returncode != 0:
         return False
     names = [line.split()[0].lower() for line in result.stdout.splitlines()[1:] if line.split()]
-    return any("qwen" in name and "4b" in name for name in names)
+    return model.lower() in names
 
 
 def gguf_roots() -> tuple[Path, ...]:
