@@ -1,12 +1,8 @@
 from __future__ import annotations
 
-import ast
-import json
-import os
-import subprocess
-import urllib.error
-import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import TypeAlias
 
 from qiffusion.qwen_bridge import (
     DEFAULT_OLLAMA_MODEL,
@@ -14,7 +10,6 @@ from qiffusion.qwen_bridge import (
     PREFERRED_MODEL_ID,
     QwenBridgeReport,
     TaskResult,
-    ollama_executable,
     ollama_has_qwen,
 )
 from qiffusion.qwen_file_tasks import (
@@ -22,11 +17,15 @@ from qiffusion.qwen_file_tasks import (
     file_edit_prompt,
     run_file_edit_smoke,
 )
+from qiffusion.qwen_ollama import extract_code, run_ollama_fixture
+from qiffusion.qwen_repair_tasks import REPAIR_TASKS, repair_prompt, run_repair_smoke
 from qiffusion.qwen_tasks import (
     CODING_TASKS,
     run_task_smoke,
     task_prompt,
 )
+
+SmokeRunner: TypeAlias = Callable[[str], tuple[bool, str, list[FixtureResult]]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,107 +43,12 @@ class TaskFailure:
     message: str
 
 
-def run_ollama_fixture(model: str, prompt: str) -> tuple[bool, str]:
-    http_ok, http_response = run_ollama_http_fixture(model, prompt)
-    if http_ok:
-        return (True, http_response)
-    executable = ollama_executable()
-    if executable is None:
-        return (False, http_response)
-    command = [
-        executable,
-        "run",
-        model,
-        "--format",
-        "json",
-        "--think",
-        "false",
-        prompt,
-    ]
-    try:
-        result = subprocess.run(
-            command,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            capture_output=True,
-            timeout=120.0,
-            check=False,
-        )
-    except subprocess.TimeoutExpired:
-        return (False, "ollama run timed out")
-    except OSError as exc:
-        return (False, f"ollama run failed: {exc}")
-    if result.returncode != 0:
-        message = result.stderr.strip() or result.stdout.strip() or f"ollama returned {result.returncode}"
-        return (False, message)
-    return (True, result.stdout)
-
-
-def run_ollama_http_fixture(model: str, prompt: str) -> tuple[bool, str]:
-    if os.environ.get("QIFFUSION_DISABLE_OLLAMA_HTTP") == "1":
-        return (False, "ollama HTTP disabled")
-    host = os.environ.get("QIFFUSION_OLLAMA_HOST", "http://127.0.0.1:11434").rstrip("/")
-    payload = json.dumps(
-        {
-            "model": model,
-            "prompt": prompt,
-            "stream": False,
-            "format": "json",
-            "think": False,
-            "options": {"temperature": 0},
-        }
-    ).encode("utf-8")
-    request = urllib.request.Request(
-        f"{host}/api/generate",
-        data=payload,
-        headers={"Content-Type": "application/json"},
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=120.0) as response:
-            body = json.loads(response.read().decode("utf-8"))
-    except (OSError, TimeoutError, json.JSONDecodeError, urllib.error.URLError) as exc:
-        return (False, f"ollama HTTP failed: {exc}")
-    generated = body.get("response") if isinstance(body, dict) else None
-    if not isinstance(generated, str) or generated == "":
-        return (False, "ollama HTTP response lacked generated text")
-    return (True, generated)
-
-
-def extract_code(response: str) -> tuple[bool, str]:
-    start = response.find("{")
-    end = response.rfind("}")
-    if start < 0 or end <= start:
-        return (False, "missing JSON object")
-    try:
-        payload = json.loads(response[start : end + 1])
-    except json.JSONDecodeError as exc:
-        return (False, f"invalid JSON: {exc}")
-    if not isinstance(payload, dict):
-        return (False, "JSON payload is not an object")
-    code = payload.get("code")
-    if not isinstance(code, str) or code.strip() == "":
-        return (False, "JSON payload lacks non-empty code string")
-    return (True, clean_code_value(code))
-
-
-def clean_code_value(code: str) -> str:
-    candidate = code.strip()
-    if not candidate.endswith("}"):
-        return candidate
-    try:
-        ast.parse(candidate)
-    except SyntaxError as exc:
-        if exc.msg != "unmatched '}'":
-            return candidate
-    else:
-        return candidate
-    trimmed = candidate[:-1].rstrip()
-    try:
-        ast.parse(trimmed)
-    except SyntaxError:
-        return candidate
-    return trimmed
+@dataclass(frozen=True, slots=True)
+class PromptEval:
+    name: str
+    label: str
+    prompt: str
+    smoke: SmokeRunner
 
 
 def qwen_eval(model: str = DEFAULT_OLLAMA_MODEL, runs: int = 1) -> QwenBridgeReport:
@@ -165,42 +69,10 @@ def qwen_eval(model: str = DEFAULT_OLLAMA_MODEL, runs: int = 1) -> QwenBridgeRep
     generated: list[str] = []
     fixture_results: list[FixtureResult] = []
     for run_number in range(1, runs + 1):
-        for task in CODING_TASKS:
-            ok, response = run_ollama_fixture(model, task_prompt(task))
-            if not ok:
-                failure = TaskFailure(task.name, run_number, ("fail", "not_run"), response)
-                return task_failure(progress(model, task_results, generated), failure)
-            parsed, code = extract_code(response)
-            if not parsed:
-                failure = TaskFailure(task.name, run_number, ("fail", "not_run"), code)
-                report = task_failure(progress(model, task_results, generated), failure)
-                report["raw_response"] = response
+        for prompt_eval in prompt_evals():
+            report = run_prompt_eval(model, run_number, prompt_eval, task_results, generated, fixture_results)
+            if report is not None:
                 return report
-            generated.append(f"# run {run_number} {task.name}\n{code}")
-            smoke_ok, smoke_message, task_fixtures = run_task_smoke(code, task)
-            fixture_results.extend(task_fixtures)
-            if not smoke_ok:
-                failure = TaskFailure(task.name, run_number, ("pass", "fail"), smoke_message)
-                return task_failure(progress(model, task_results, generated), failure)
-            task_results.append({"name": task.name, "run": run_number, "status": "pass", "generated_code": code})
-        for task in FILE_EDIT_TASKS:
-            ok, response = run_ollama_fixture(model, file_edit_prompt(task))
-            if not ok:
-                failure = TaskFailure(task.name, run_number, ("fail", "not_run"), response)
-                return task_failure(progress(model, task_results, generated), failure)
-            parsed, code = extract_code(response)
-            if not parsed:
-                failure = TaskFailure(task.name, run_number, ("fail", "not_run"), code)
-                report = task_failure(progress(model, task_results, generated), failure)
-                report["raw_response"] = response
-                return report
-            generated.append(f"# run {run_number} file-edit {task.name}\n{code}")
-            smoke_ok, smoke_message, task_fixtures = run_file_edit_smoke(code, task)
-            fixture_results.extend(task_fixtures)
-            if not smoke_ok:
-                failure = TaskFailure(task.name, run_number, ("pass", "fail"), smoke_message)
-                return task_failure(progress(model, task_results, generated), failure)
-            task_results.append({"name": task.name, "run": run_number, "status": "pass", "generated_code": code})
     return {
         "backend": "qwen_bridge",
         "model_id": PREFERRED_MODEL_ID,
@@ -216,6 +88,59 @@ def qwen_eval(model: str = DEFAULT_OLLAMA_MODEL, runs: int = 1) -> QwenBridgeRep
         "runs": runs,
         "task_results": task_results,
     }
+
+
+def prompt_evals() -> list[PromptEval]:
+    evals: list[PromptEval] = []
+    for task in CODING_TASKS:
+        evals.append(PromptEval(task.name, task.name, task_prompt(task), lambda code, task=task: run_task_smoke(code, task)))
+    for task in FILE_EDIT_TASKS:
+        evals.append(
+            PromptEval(
+                task.name,
+                f"file-edit {task.name}",
+                file_edit_prompt(task),
+                lambda code, task=task: run_file_edit_smoke(code, task),
+            )
+        )
+    for task in REPAIR_TASKS:
+        evals.append(
+            PromptEval(
+                task.name,
+                f"repair {task.name}",
+                repair_prompt(task),
+                lambda code, task=task: run_repair_smoke(code, task),
+            )
+        )
+    return evals
+
+
+def run_prompt_eval(
+    model: str,
+    run_number: int,
+    prompt_eval: PromptEval,
+    task_results: list[TaskResult],
+    generated: list[str],
+    fixture_results: list[FixtureResult],
+) -> QwenBridgeReport | None:
+    ok, response = run_ollama_fixture(model, prompt_eval.prompt)
+    if not ok:
+        failure = TaskFailure(prompt_eval.name, run_number, ("fail", "not_run"), response)
+        return task_failure(progress(model, task_results, generated), failure)
+    parsed, code = extract_code(response)
+    if not parsed:
+        failure = TaskFailure(prompt_eval.name, run_number, ("fail", "not_run"), code)
+        report = task_failure(progress(model, task_results, generated), failure)
+        report["raw_response"] = response
+        return report
+    generated.append(f"# run {run_number} {prompt_eval.label}\n{code}")
+    smoke_ok, smoke_message, task_fixtures = prompt_eval.smoke(code)
+    fixture_results.extend(task_fixtures)
+    if not smoke_ok:
+        failure = TaskFailure(prompt_eval.name, run_number, ("pass", "fail"), smoke_message)
+        return task_failure(progress(model, task_results, generated), failure)
+    task_results.append({"name": prompt_eval.name, "run": run_number, "status": "pass", "generated_code": code})
+    return None
 
 
 def progress(model: str, task_results: list[TaskResult], generated: list[str]) -> EvalProgress:

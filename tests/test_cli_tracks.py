@@ -32,9 +32,18 @@ PASSING_QWEN_CODE = (
     "    if celsius <= 30:\n"
     "        return 'warm'\n"
     "    return 'hot'\n"
+    "def slugify_title(title):\n"
+    "    return '-'.join(title.lower().split())\n"
 )
 
-EXPECTED_TASKS = {"add", "count_even", "reverse_words", "merge_intervals", "classify_temperature"}
+EXPECTED_TASKS = {
+    "add",
+    "count_even",
+    "reverse_words",
+    "merge_intervals",
+    "classify_temperature",
+    "slugify_title",
+}
 
 
 def write_fake_ollama(tmp_path: Path, *, model_list: str, code: str) -> None:
@@ -164,7 +173,7 @@ def test_qwen_eval_aggregates_repeated_runs(
     report = json.loads(output.read_text(encoding="utf-8"))
     assert report["runs"] == 2
     assert report["coding_capability_claim"] is True
-    assert len(report["task_results"]) == 10
+    assert len(report["task_results"]) == 12
     assert {item["run"] for item in report["task_results"]} == {1, 2}
 
 
