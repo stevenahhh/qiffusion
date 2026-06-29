@@ -42,7 +42,7 @@ This GitHub repository is public. Future completed Codex work in this repo shoul
 
 `qwen-status` checks for a runnable local Qwen/Qwen3.5-4B bridge engine and writes a JSON report. A Hugging Face snapshot must have non-empty metadata and weights, and the local `transformers` runtime must be usable. It may return `prerequisite_missing` without failing; discovery is not a coding-capability claim. GGUF fallback scans the current directory by default; set `QIFFUSION_GGUF_ROOTS` to opt into additional roots.
 
-`qwen-eval` runs independent local Ollama `qwen3.5:4b` coding tasks, including arithmetic, list, string, and interval-merging checks. Each task asks for one Python function, prefers Ollama's `stream: false` HTTP API for clean JSON, parses the response, executes the generated code under narrow smoke tests, and only sets `coding_capability_claim` when every task passes.
+`qwen-eval` runs independent local Ollama `qwen3.5:4b` coding tasks, including arithmetic, list, string, interval-merging, and small file-editing checks. Each task asks for Python code, prefers Ollama's `stream: false` HTTP API for clean JSON, parses the response, executes the generated code under narrow smoke tests, and only sets `coding_capability_claim` when every task passes.
 Use `--runs N` to require the full independent-task suite to pass repeatedly in one report.
 
 `backend-status --backend diffusion` writes the current diffusion scaffold report. The scaffold is selectable through the shared gate but is not a training, sampling, chat, or coding-capable implementation yet.

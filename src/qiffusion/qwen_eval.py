@@ -10,15 +10,20 @@ from dataclasses import dataclass
 
 from qiffusion.qwen_bridge import (
     DEFAULT_OLLAMA_MODEL,
+    FixtureResult,
     PREFERRED_MODEL_ID,
     QwenBridgeReport,
     TaskResult,
     ollama_executable,
     ollama_has_qwen,
 )
+from qiffusion.qwen_file_tasks import (
+    FILE_EDIT_TASKS,
+    file_edit_prompt,
+    run_file_edit_smoke,
+)
 from qiffusion.qwen_tasks import (
     CODING_TASKS,
-    CodingTask,
     run_task_smoke,
     task_prompt,
 )
@@ -33,7 +38,7 @@ class EvalProgress:
 
 @dataclass(frozen=True, slots=True)
 class TaskFailure:
-    task: CodingTask
+    task_name: str
     run: int
     statuses: tuple[str, str]
     message: str
@@ -158,16 +163,16 @@ def qwen_eval(model: str = DEFAULT_OLLAMA_MODEL, runs: int = 1) -> QwenBridgeRep
         }
     task_results: list[TaskResult] = []
     generated: list[str] = []
-    fixture_results = []
+    fixture_results: list[FixtureResult] = []
     for run_number in range(1, runs + 1):
         for task in CODING_TASKS:
             ok, response = run_ollama_fixture(model, task_prompt(task))
             if not ok:
-                failure = TaskFailure(task, run_number, ("fail", "not_run"), response)
+                failure = TaskFailure(task.name, run_number, ("fail", "not_run"), response)
                 return task_failure(progress(model, task_results, generated), failure)
             parsed, code = extract_code(response)
             if not parsed:
-                failure = TaskFailure(task, run_number, ("fail", "not_run"), code)
+                failure = TaskFailure(task.name, run_number, ("fail", "not_run"), code)
                 report = task_failure(progress(model, task_results, generated), failure)
                 report["raw_response"] = response
                 return report
@@ -175,7 +180,25 @@ def qwen_eval(model: str = DEFAULT_OLLAMA_MODEL, runs: int = 1) -> QwenBridgeRep
             smoke_ok, smoke_message, task_fixtures = run_task_smoke(code, task)
             fixture_results.extend(task_fixtures)
             if not smoke_ok:
-                failure = TaskFailure(task, run_number, ("pass", "fail"), smoke_message)
+                failure = TaskFailure(task.name, run_number, ("pass", "fail"), smoke_message)
+                return task_failure(progress(model, task_results, generated), failure)
+            task_results.append({"name": task.name, "run": run_number, "status": "pass", "generated_code": code})
+        for task in FILE_EDIT_TASKS:
+            ok, response = run_ollama_fixture(model, file_edit_prompt(task))
+            if not ok:
+                failure = TaskFailure(task.name, run_number, ("fail", "not_run"), response)
+                return task_failure(progress(model, task_results, generated), failure)
+            parsed, code = extract_code(response)
+            if not parsed:
+                failure = TaskFailure(task.name, run_number, ("fail", "not_run"), code)
+                report = task_failure(progress(model, task_results, generated), failure)
+                report["raw_response"] = response
+                return report
+            generated.append(f"# run {run_number} file-edit {task.name}\n{code}")
+            smoke_ok, smoke_message, task_fixtures = run_file_edit_smoke(code, task)
+            fixture_results.extend(task_fixtures)
+            if not smoke_ok:
+                failure = TaskFailure(task.name, run_number, ("pass", "fail"), smoke_message)
                 return task_failure(progress(model, task_results, generated), failure)
             task_results.append({"name": task.name, "run": run_number, "status": "pass", "generated_code": code})
     return {
@@ -203,7 +226,7 @@ def task_failure(progress: EvalProgress, failure: TaskFailure) -> QwenBridgeRepo
     fixtures_status, code_smoke_status = failure.statuses
     task_results = [
         *progress.task_results,
-        {"name": failure.task.name, "run": failure.run, "status": "fail", "error": failure.message},
+        {"name": failure.task_name, "run": failure.run, "status": "fail", "error": failure.message},
     ]
     report = eval_failure(progress.model, fixtures_status, code_smoke_status, failure.message)
     report["generated_code"] = "\n\n".join(progress.generated)
