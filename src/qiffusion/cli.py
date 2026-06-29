@@ -60,8 +60,12 @@ def build_parser() -> argparse.ArgumentParser:
     diffusion_sample.add_argument("--seed", type=int, default=1)
     diffusion_sample.add_argument("--out", type=Path)
 
-    diffusion_eval = subcommands.add_parser("diffusion-eval", help="Write a non-claiming diffusion eval stub report.")
-    diffusion_eval.add_argument("--report-out", type=Path, required=True)
+    diffusion_eval = subcommands.add_parser("diffusion-eval", help="Write a diffusion eval report.")
+    diffusion_eval.add_argument("--report-out", type=Path)
+    diffusion_eval.add_argument("--checkpoint", type=Path)
+    diffusion_eval.add_argument("--runs", type=positive_int, default=1)
+    diffusion_eval.add_argument("--seed", type=int, default=1)
+    diffusion_eval.add_argument("--out", type=Path)
 
     diffusion_export = subcommands.add_parser("diffusion-export-teacher", help="Export passing Qwen task code to JSONL.")
     diffusion_export.add_argument("--qwen-report", type=Path, action="append", required=True)
@@ -149,6 +153,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps(report, sort_keys=True))
         return 0
     if args.command == "diffusion-eval":
+        if args.checkpoint is not None and args.out is not None:
+            from qiffusion.diffusion_eval import DiffusionEvalConfig, eval_checkpoint
+
+            report = eval_checkpoint(
+                DiffusionEvalConfig(
+                    checkpoint_path=args.checkpoint,
+                    runs=args.runs,
+                    seed=args.seed,
+                )
+            )
+            write_json(args.out, report)
+            print(json.dumps(report, sort_keys=True))
+            return 0
         report = diffusion_stub_report("eval")
         write_json(args.report_out, report)
         print(json.dumps(report, sort_keys=True))
