@@ -9,6 +9,26 @@ import pytest
 from qiffusion.cli import main
 
 
+PASSING_QWEN_CODE = (
+    "def add(a, b):\n"
+    "    return a + b\n"
+    "def count_even(values):\n"
+    "    return sum(1 for value in values if value % 2 == 0)\n"
+    "def reverse_words(text):\n"
+    "    return ' '.join(reversed(text.split()))\n"
+    "def merge_intervals(intervals):\n"
+    "    merged = []\n"
+    "    for start, end in sorted(intervals):\n"
+    "        if not merged or start > merged[-1][1]:\n"
+    "            merged.append([start, end])\n"
+    "        elif end > merged[-1][1]:\n"
+    "            merged[-1][1] = end\n"
+    "    return merged\n"
+)
+
+EXPECTED_TASKS = {"add", "count_even", "reverse_words", "merge_intervals"}
+
+
 def write_fake_ollama(tmp_path: Path, *, model_list: str, code: str) -> None:
     script = tmp_path / "fake_ollama.py"
     script.write_text(
@@ -92,14 +112,7 @@ def test_qwen_eval_promotes_after_fake_ollama_code_passes(
     write_fake_ollama(
         tmp_path,
         model_list="qwen3.5:4b abc 3.4 GB now",
-        code=(
-            "def add(a, b):\n"
-            "    return a + b\n"
-            "def count_even(values):\n"
-            "    return sum(1 for value in values if value % 2 == 0)\n"
-            "def reverse_words(text):\n"
-            "    return ' '.join(reversed(text.split()))\n"
-        ),
+        code=PASSING_QWEN_CODE,
     )
     monkeypatch.setenv("PATH", str(tmp_path))
     monkeypatch.setenv("QIFFUSION_DISABLE_HF", "1")
@@ -117,17 +130,9 @@ def test_qwen_eval_promotes_after_fake_ollama_code_passes(
     assert report["code_smoke_status"] == "pass"
     assert report["candidate_source"] == "ollama:qwen3.5:4b"
     assert report["coding_capability_claim"] is True
-    assert {item["name"] for item in report["task_results"]} == {
-        "add",
-        "count_even",
-        "reverse_words",
-    }
+    assert {item["name"] for item in report["task_results"]} == EXPECTED_TASKS
     assert {item["run"] for item in report["task_results"]} == {1}
-    assert {item["name"] for item in report["fixture_results"]} == {
-        "add",
-        "count_even",
-        "reverse_words",
-    }
+    assert {item["name"] for item in report["fixture_results"]} == EXPECTED_TASKS
 
 
 def test_qwen_eval_aggregates_repeated_runs(
@@ -137,14 +142,7 @@ def test_qwen_eval_aggregates_repeated_runs(
     write_fake_ollama(
         tmp_path,
         model_list="qwen3.5:4b abc 3.4 GB now",
-        code=(
-            "def add(a, b):\n"
-            "    return a + b\n"
-            "def count_even(values):\n"
-            "    return sum(1 for value in values if value % 2 == 0)\n"
-            "def reverse_words(text):\n"
-            "    return ' '.join(reversed(text.split()))\n"
-        ),
+        code=PASSING_QWEN_CODE,
     )
     monkeypatch.setenv("PATH", str(tmp_path))
     monkeypatch.setenv("QIFFUSION_DISABLE_HF", "1")
@@ -158,7 +156,7 @@ def test_qwen_eval_aggregates_repeated_runs(
     report = json.loads(output.read_text(encoding="utf-8"))
     assert report["runs"] == 2
     assert report["coding_capability_claim"] is True
-    assert len(report["task_results"]) == 6
+    assert len(report["task_results"]) == 8
     assert {item["run"] for item in report["task_results"]} == {1, 2}
 
 

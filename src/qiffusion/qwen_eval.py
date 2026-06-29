@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 import os
 import subprocess
@@ -119,7 +120,26 @@ def extract_code(response: str) -> tuple[bool, str]:
     code = payload.get("code")
     if not isinstance(code, str) or code.strip() == "":
         return (False, "JSON payload lacks non-empty code string")
-    return (True, code)
+    return (True, clean_code_value(code))
+
+
+def clean_code_value(code: str) -> str:
+    candidate = code.strip()
+    if not candidate.endswith("}"):
+        return candidate
+    try:
+        ast.parse(candidate)
+    except SyntaxError as exc:
+        if exc.msg != "unmatched '}'":
+            return candidate
+    else:
+        return candidate
+    trimmed = candidate[:-1].rstrip()
+    try:
+        ast.parse(trimmed)
+    except SyntaxError:
+        return candidate
+    return trimmed
 
 
 def qwen_eval(model: str = DEFAULT_OLLAMA_MODEL, runs: int = 1) -> QwenBridgeReport:

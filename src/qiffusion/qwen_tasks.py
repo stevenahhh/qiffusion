@@ -55,6 +55,23 @@ CODING_TASKS: Final = (
         ),
         cases=(FixtureCase(("one two three",), "three two one"), FixtureCase(("  solo ",), "solo")),
     ),
+    CodingTask(
+        name="merge_intervals",
+        signature="def merge_intervals(intervals):",
+        behavior=(
+            "return sorted merged [start, end] interval lists; overlapping or touching intervals "
+            "must merge when the next start is less than or equal to the current end"
+        ),
+        examples=(
+            "merge_intervals([[5, 7], [1, 3], [2, 4]]) == [[1, 4], [5, 7]]",
+            "merge_intervals([[1, 2], [2, 3], [8, 9]]) == [[1, 3], [8, 9]]",
+        ),
+        cases=(
+            FixtureCase(([[5, 7], [1, 3], [2, 4]],), [[1, 4], [5, 7]]),
+            FixtureCase(([[1, 2], [2, 3], [8, 9]],), [[1, 3], [8, 9]]),
+            FixtureCase(([],), []),
+        ),
+    ),
 )
 
 
@@ -64,6 +81,7 @@ def task_prompt(task: CodingTask) -> str:
         f"Define exactly one Python function with this signature: {task.signature} "
         f"It must {task.behavior}. "
         f"Examples: {'; '.join(task.examples)}. "
+        "The code string must contain Python code only, with no JSON braces outside Python syntax. "
         "Do not print, import, define extra functions, use markdown, JavaScript, explanations, or tests."
     )
 
@@ -106,8 +124,10 @@ def make_namespace() -> dict[str, JsonValue | dict[str, type[list] | type[int] |
             "isinstance": isinstance,
             "len": len,
             "list": list,
+            "max": max,
             "range": range,
             "reversed": reversed,
+            "sorted": sorted,
             "str": str,
             "sum": sum,
         }
