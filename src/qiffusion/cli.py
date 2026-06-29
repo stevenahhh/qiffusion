@@ -8,6 +8,8 @@ from typing import Sequence, TypeAlias
 from qiffusion.backends import diffusion_status
 from qiffusion.config import CODING_CAPABLE_REQUIREMENTS, TRACKS
 from qiffusion.decision import decide_from_file
+from qiffusion.diffusion_reports import diffusion_stub_report
+from qiffusion.diffusion_teacher_data import export_teacher_jsonl
 from qiffusion.qwen_bridge import DEFAULT_OLLAMA_MODEL, qwen_status
 from qiffusion.qwen_eval import qwen_eval
 
@@ -41,6 +43,19 @@ def build_parser() -> argparse.ArgumentParser:
     backend = subcommands.add_parser("backend-status", help="Write backend scaffold status.")
     backend.add_argument("--backend", choices=("diffusion",), required=True)
     backend.add_argument("--out", type=Path, required=True)
+
+    diffusion_train = subcommands.add_parser("diffusion-train", help="Write a non-claiming diffusion train stub report.")
+    diffusion_train.add_argument("--report-out", type=Path, required=True)
+
+    diffusion_sample = subcommands.add_parser("diffusion-sample", help="Write a non-claiming diffusion sample stub report.")
+    diffusion_sample.add_argument("--report-out", type=Path, required=True)
+
+    diffusion_eval = subcommands.add_parser("diffusion-eval", help="Write a non-claiming diffusion eval stub report.")
+    diffusion_eval.add_argument("--report-out", type=Path, required=True)
+
+    diffusion_export = subcommands.add_parser("diffusion-export-teacher", help="Export passing Qwen task code to JSONL.")
+    diffusion_export.add_argument("--qwen-report", type=Path, action="append", required=True)
+    diffusion_export.add_argument("--out", type=Path, required=True)
     return parser
 
 
@@ -83,6 +98,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         report = diffusion_status()
         write_json(args.out, report)
         print(json.dumps(report, sort_keys=True))
+        return 0
+    if args.command == "diffusion-train":
+        report = diffusion_stub_report("train")
+        write_json(args.report_out, report)
+        print(json.dumps(report, sort_keys=True))
+        return 0
+    if args.command == "diffusion-sample":
+        report = diffusion_stub_report("sample")
+        write_json(args.report_out, report)
+        print(json.dumps(report, sort_keys=True))
+        return 0
+    if args.command == "diffusion-eval":
+        report = diffusion_stub_report("eval")
+        write_json(args.report_out, report)
+        print(json.dumps(report, sort_keys=True))
+        return 0
+    if args.command == "diffusion-export-teacher":
+        count = export_teacher_jsonl(tuple(args.qwen_report), args.out)
+        payload = {"status": "exported", "records": count, "out": str(args.out)}
+        print(json.dumps(payload, sort_keys=True))
         return 0
     raise AssertionError(f"unhandled command: {args.command}")
 
