@@ -120,7 +120,7 @@ Your next move: execute this plan through `$start-work`; no further product deci
   QA scenarios (name the exact tool + invocation): Happy command: `python -c "from pathlib import Path; from qiffusion.qwen_diffusion_model import write_tiny_model_evidence; write_tiny_model_evidence(Path('.omo/evidence/qwen-diffusion-training-loop-plan-set/task-5-model.json'), batch_size=1, sequence_length=8, vocab_size=64)"` and assert logits/config/compatibility metadata are present. Failure command: `python -c "from pathlib import Path; from qiffusion.qwen_diffusion_model import write_mismatch_checkpoint_probe; write_mismatch_checkpoint_probe(Path('.omo/evidence/qwen-diffusion-training-loop-plan-set/task-5-mismatch-failure.json'))"` and assert the artifact records tokenizer/config mismatch.
   Commit: Y | `feat(model): add qwen token denoiser scaffold`
 
-- [ ] 6. Add iterative mask sampler interface with confidence history and no fallback.
+- [x] 6. Add iterative mask sampler interface with confidence history and no fallback.
   What to do / Must NOT do: Add a Qwen-token sampler interface supporting fixed steps, seed, temperature, top-k, confidence or entropy scores, early stop metadata, and history. It may run against the tiny scaffold from todo 5. It must not call Qwen/Ollama for generated tokens.
   Parallelization: Wave 2 | Blocked by: 3, 5 | Blocks: 7, 10
   References (executor has NO interview context - be exhaustive): `docs/qwen-diffusion-coding-model-ultraresearch.md:63`, `docs/qwen-diffusion-coding-model-ultraresearch.md:67`, `docs/qwen-diffusion-coding-model-ultraresearch.md:221`, `src/qiffusion/diffusion_sample.py:37`, `src/qiffusion/diffusion_sample.py:45`, `src/qiffusion/diffusion_sample.py:54`
