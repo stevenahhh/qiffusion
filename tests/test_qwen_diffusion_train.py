@@ -85,12 +85,67 @@ def test_qwen_diffusion_train_cli_blocks_benchmark_manifest(tmp_path: Path) -> N
     assert report["coding_capability_claim"] is False
 
 
+def test_qwen_diffusion_train_cli_blocks_unknown_usage_manifest(tmp_path: Path) -> None:
+    manifest = _write_manifest(tmp_path, usage="unknown_blocked", contamination_status="clean")
+    report_path = tmp_path / "blocked-usage.json"
+
+    exit_code = main(
+        [
+            "qwen-diffusion-train",
+            "--manifest",
+            str(manifest),
+            "--tokenizer",
+            "byte",
+            "--steps",
+            "1",
+            "--checkpoint-out",
+            str(tmp_path / "blocked-usage.pt"),
+            "--report-out",
+            str(report_path),
+        ]
+    )
+
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert exit_code == 2
+    assert report["status"] == "blocked"
+    assert report["blocked_sources"] == ["snippet.py"]
+    assert report["coding_capability_claim"] is False
+
+
+def test_qwen_diffusion_train_cli_blocks_non_local_manifest_record(tmp_path: Path) -> None:
+    manifest = _write_manifest(tmp_path, usage="train_allowed", contamination_status="clean", source_kind="external")
+    report_path = tmp_path / "blocked-source-kind.json"
+
+    exit_code = main(
+        [
+            "qwen-diffusion-train",
+            "--manifest",
+            str(manifest),
+            "--tokenizer",
+            "byte",
+            "--steps",
+            "1",
+            "--checkpoint-out",
+            str(tmp_path / "blocked-source-kind.pt"),
+            "--report-out",
+            str(report_path),
+        ]
+    )
+
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert exit_code == 2
+    assert report["status"] == "blocked"
+    assert report["blocked_sources"] == ["snippet.py"]
+    assert report["coding_capability_claim"] is False
+
+
 def _write_manifest(
     tmp_path: Path,
     *,
     usage: str,
     contamination_status: str,
     source: str = "snippet.py",
+    source_kind: str = "local",
 ) -> Path:
     source_path = tmp_path / source
     source_path.parent.mkdir(parents=True, exist_ok=True)
@@ -106,7 +161,7 @@ def _write_manifest(
                 "records": [
                     {
                         "source": source,
-                        "source_kind": "local",
+                        "source_kind": source_kind,
                         "name": "snippet",
                         "license": "MIT",
                         "split": "train",

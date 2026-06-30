@@ -230,12 +230,13 @@ def _record(manifest_path: Path, payload: JsonValue) -> Mapping[str, JsonValue]:
 
 def _blocks_training(record: Mapping[str, JsonValue], tokenizer_id: str) -> bool:
     source = _string(record, "source")
-    usage = _string(record, "usage")
+    usage, source_kind = _string(record, "usage"), _string(record, "source_kind")
     contamination = _string(record, "contamination_status")
     split = _string(record, "split")
     tokenizer = _string(record, "tokenizer")
     return (
-        usage == "eval_only"
+        usage != "train_allowed"
+        or source_kind != "local"
         or contamination != "clean"
         or split != "train"
         or tokenizer != tokenizer_id
