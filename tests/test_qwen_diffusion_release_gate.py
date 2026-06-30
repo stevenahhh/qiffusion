@@ -34,6 +34,20 @@ def test_final_gate_completes_only_with_all_required_evidence_and_lineage() -> N
     assert decision.reason == "qwen diffusion release gate passed"
 
 
+def test_final_gate_rejects_byte_tokenizer_for_final_completion() -> None:
+    report = _passing_report()
+    lineage_value = report["checkpoint_lineage"]
+    assert isinstance(lineage_value, dict)
+    lineage = dict(lineage_value)
+    lineage["tokenizer_id"] = "byte"
+    report["checkpoint_lineage"] = lineage
+
+    decision = decide_coding_capable(report)
+
+    assert decision.status == "blocked"
+    assert decision.reason == "qwen tokenizer evidence is missing"
+
+
 def test_final_gate_blocks_hidden_fallback_and_benchmark_contamination() -> None:
     fallback_report = _passing_report()
     fallback_report["fallback_used"] = True
@@ -99,7 +113,7 @@ def _passing_report() -> JsonObject:
             "parent_checkpoint_id": "qwen-diffusion-parent",
             "objective": "masked_ce",
             "mask_schedule": "linear",
-            "tokenizer_id": "byte",
+            "tokenizer_id": "Qwen/Qwen3.5-4B",
         },
     }
 

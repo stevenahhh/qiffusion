@@ -29,6 +29,7 @@ REQUIRED_LINEAGE_FIELDS: Final = (
     "mask_schedule",
     "tokenizer_id",
 )
+QWEN_TOKENIZER_MARKERS: Final = ("qwen",)
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,6 +86,8 @@ def _decide_qwen_release(report: JsonObject) -> GateDecision:
     missing_lineage = tuple(field for field in REQUIRED_LINEAGE_FIELDS if not _has_text(lineage.get(field)))
     if len(missing_lineage) > 0:
         return GateDecision("blocked", f"checkpoint lineage is incomplete: {', '.join(missing_lineage)}")
+    if not _is_qwen_tokenizer_id(lineage.get("tokenizer_id")):
+        return GateDecision("blocked", "qwen tokenizer evidence is missing")
     buckets = _mapping(report.get("buckets"))
     if buckets is None:
         return GateDecision("continue", "qwen eval buckets are missing")
@@ -118,3 +121,10 @@ def _mapping(value: JsonValue) -> JsonObject | None:
 
 def _has_text(value: JsonValue) -> bool:
     return isinstance(value, str) and value.strip() != ""
+
+
+def _is_qwen_tokenizer_id(value: JsonValue) -> bool:
+    if not isinstance(value, str):
+        return False
+    lowered = value.lower()
+    return any(marker in lowered for marker in QWEN_TOKENIZER_MARKERS)

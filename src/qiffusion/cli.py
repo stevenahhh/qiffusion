@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Sequence, TypeAlias
+from typing import Protocol, Sequence
 
 from qiffusion.backends import diffusion_status
 from qiffusion.config import CODING_CAPABLE_REQUIREMENTS, TRACKS
@@ -15,9 +15,11 @@ from qiffusion.qwen_bridge import DEFAULT_OLLAMA_MODEL, qwen_status
 from qiffusion.qwen_diffusion_chat_agent_cli import add_qwen_diffusion_chat_agent_parser, run_qwen_diffusion_chat_agent_validate
 from qiffusion.qwen_diffusion_data_loop_cli import add_qwen_diffusion_data_loop_parser, run_qwen_diffusion_data_loop
 from qiffusion.qwen_diffusion_loop_cli import add_qwen_diffusion_loop_parser, run_qwen_diffusion_loop_cli
+from qiffusion.qwen_diffusion_plan_audit import add_qwen_diffusion_plan_audit_parser, run_qwen_diffusion_plan_audit
 from qiffusion.qwen_eval import qwen_eval
 
-JsonValue: TypeAlias = str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
+class JsonSerializable(Protocol):
+    pass
 
 
 def positive_int(value: str) -> int:
@@ -66,6 +68,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     add_qwen_diffusion_data_loop_parser(subcommands)
     add_qwen_diffusion_loop_parser(subcommands)
+    add_qwen_diffusion_plan_audit_parser(subcommands)
 
     diffusion_sample = subcommands.add_parser("diffusion-sample", help="Write a non-claiming diffusion sample report.")
     diffusion_sample.add_argument("--report-out", type=Path)
@@ -116,7 +119,7 @@ def print_plan() -> None:
     print(json.dumps(payload, indent=2, sort_keys=True))
 
 
-def write_json(path: Path, payload: JsonValue) -> None:
+def write_json(path: Path, payload: JsonSerializable) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
@@ -190,6 +193,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return run_qwen_diffusion_data_loop(tuple(args.teacher_jsonl), args.manifest, args.out)
     if args.command == "qwen-diffusion-loop":
         return run_qwen_diffusion_loop_cli(args)
+    if args.command == "qwen-diffusion-plan-audit":
+        return run_qwen_diffusion_plan_audit(args)
     if args.command == "diffusion-sample":
         if args.checkpoint is not None and args.out is not None:
             from qiffusion.diffusion_sample import DiffusionSampleConfig, sample_from_checkpoint
