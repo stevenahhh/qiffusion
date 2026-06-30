@@ -8,6 +8,12 @@ from typing import Sequence, TypeAlias
 from qiffusion.backends import diffusion_status
 from qiffusion.config import CODING_CAPABLE_REQUIREMENTS, TRACKS
 from qiffusion.decision import decide_from_file
+from qiffusion.diffusion_corpus_manifest import (
+    MalformedTeacherJsonlError,
+    ManifestBuildConfig,
+    write_manifest,
+    write_manifest_error,
+)
 from qiffusion.diffusion_reports import diffusion_stub_report
 from qiffusion.diffusion_teacher_data import export_teacher_jsonl
 from qiffusion.qwen_bridge import DEFAULT_OLLAMA_MODEL, qwen_status
@@ -70,6 +76,13 @@ def build_parser() -> argparse.ArgumentParser:
     diffusion_export = subcommands.add_parser("diffusion-export-teacher", help="Export passing Qwen task code to JSONL.")
     diffusion_export.add_argument("--qwen-report", type=Path, action="append", required=True)
     diffusion_export.add_argument("--out", type=Path, required=True)
+
+    corpus = subcommands.add_parser("diffusion-corpus", help="Manage diffusion corpus metadata.")
+    corpus_subcommands = corpus.add_subparsers(dest="corpus_command", required=True)
+    corpus_manifest = corpus_subcommands.add_parser("manifest", help="Write corpus provenance manifest JSON.")
+    corpus_manifest.add_argument("--root", type=Path, required=True)
+    corpus_manifest.add_argument("--teacher-jsonl", type=Path, action="append")
+    corpus_manifest.add_argument("--out", type=Path, required=True)
     return parser
 
 
@@ -175,6 +188,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         payload = {"status": "exported", "records": count, "out": str(args.out)}
         print(json.dumps(payload, sort_keys=True))
         return 0
+    if args.command == "diffusion-corpus":
+        if args.corpus_command == "manifest":
+            try:
+                manifest = write_manifest(
+                    ManifestBuildConfig(
+                        root=args.root,
+                        teacher_jsonl_paths=tuple(args.teacher_jsonl or ()),
+                    ),
+                    args.out,
+                )
+            except MalformedTeacherJsonlError as error:
+                payload = write_manifest_error(error, args.out)
+                print(json.dumps(payload, sort_keys=True))
+                return 2
+            print(json.dumps({"status": manifest["status"], "records": len(manifest["records"]), "out": str(args.out)}, sort_keys=True))
+            return 0
     raise AssertionError(f"unhandled command: {args.command}")
 
 

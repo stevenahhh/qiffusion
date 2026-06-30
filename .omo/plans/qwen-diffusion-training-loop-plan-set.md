@@ -80,7 +80,7 @@ Your next move: execute this plan through `$start-work`; no further product deci
 ## Todos
 > Implementation + Test = ONE todo. Never separate.
 <!-- APPEND TASK BATCHES BELOW THIS LINE WITH edit/apply_patch - never rewrite the headers above. -->
-- [ ] 1. Add corpus manifest and provenance surface.
+- [x] 1. Add corpus manifest and provenance surface.
   What to do / Must NOT do: Add a manifest module and CLI path for local corpora, teacher JSONL, and future external corpora. It must record source, license, split, tokenizer, token counts, dedup hash, usage (`train_allowed`, `eval_only`, `unknown_blocked`), contamination status (`clean`, `suspect`, `blocked`), and privacy/policy notes. Do not ingest broad external corpora yet.
   Parallelization: Wave 1 | Blocked by: none | Blocks: 5, 7, 9, 10, 12
   References (executor has NO interview context - be exhaustive): `docs/qwen-diffusion-coding-model-ultraresearch.md:12`, `docs/qwen-diffusion-coding-model-ultraresearch.md:81`, `docs/qwen-diffusion-coding-model-ultraresearch.md:120`, `docs/qwen-diffusion-coding-model-ultraresearch.md:145`, `docs/qwen-diffusion-coding-model-ultraresearch.md:292`, `src/qiffusion/diffusion_data.py:18`, `src/qiffusion/diffusion_data.py:64`, `src/qiffusion/cli.py:26`
@@ -88,7 +88,7 @@ Your next move: execute this plan through `$start-work`; no further product deci
   QA scenarios (name the exact tool + invocation): Happy command: `python -m qiffusion.cli diffusion-corpus manifest --root . --out .omo/evidence/qwen-diffusion-training-loop-plan-set/task-1-manifest.json` and assert JSON includes nonempty records, tokenizer, token counts, usage, and contamination status. Failure command: `python -m qiffusion.cli diffusion-corpus manifest --root . --teacher-jsonl .omo/evidence/qwen-diffusion-training-loop-plan-set/task-1-malformed.jsonl --out .omo/evidence/qwen-diffusion-training-loop-plan-set/task-1-manifest-failure.json` and assert nonzero exit or structured error evidence.
   Commit: Y | `feat(data): add diffusion corpus manifest`
 
-- [ ] 2. Add teacher trace schema for code, chat, tool, repair, and execution records.
+- [x] 2. Add teacher trace schema for code, chat, tool, repair, and execution records.
   What to do / Must NOT do: Define structured teacher-trace records with provenance fields for source, license, teacher model, prompt hash, checker hash, task type, execution outcome, and policy notes. Update only the existing `diffusion-export-teacher` boundary needed to emit or validate these records. Do not add a new CLI subcommand and do not rewrite the Qwen evaluator itself unless a failing test requires it.
   Parallelization: Wave 1 | Blocked by: none | Blocks: 9, 11
   References (executor has NO interview context - be exhaustive): `docs/qwen-diffusion-coding-model-ultraresearch.md:91`, `docs/qwen-diffusion-coding-model-ultraresearch.md:111`, `docs/qwen-diffusion-coding-model-ultraresearch.md:303`, `src/qiffusion/diffusion_teacher_data.py:50`, `src/qiffusion/cli.py:70`, `tests/test_diffusion_teacher_data.py`
@@ -96,7 +96,7 @@ Your next move: execute this plan through `$start-work`; no further product deci
   QA scenarios (name the exact tool + invocation): Happy command: `python -m qiffusion.cli diffusion-export-teacher --qwen-report .omo/evidence/qwen-diffusion-training-loop-plan-set/task-2-qwen-report.json --out .omo/evidence/qwen-diffusion-training-loop-plan-set/task-2-teacher.jsonl` using a fixture created by the worker at that exact report path, then validate each line against the new schema. Failure command: `python -m qiffusion.cli diffusion-export-teacher --qwen-report .omo/evidence/qwen-diffusion-training-loop-plan-set/task-2-missing-provenance-report.json --out .omo/evidence/qwen-diffusion-training-loop-plan-set/task-2-teacher-failure.jsonl` and assert missing license/checker hash rejection is captured.
   Commit: Y | `feat(data): add teacher trace schema`
 
-- [ ] 3. Add Qwen tokenizer adapter and tokenization boundary.
+- [x] 3. Add Qwen tokenizer adapter and tokenization boundary.
   What to do / Must NOT do: Add a tokenizer abstraction that can use a local Qwen tokenizer through optional dynamic import of `transformers` when available, while keeping `ByteTokenizer` as the deterministic tiny-test fallback. Do not make `transformers` a mandatory dependency for existing tests; add an optional extra only if the package metadata tests require it.
   Parallelization: Wave 1 | Blocked by: none | Blocks: 5, 6, 7
   References (executor has NO interview context - be exhaustive): `docs/qwen-diffusion-coding-model-ultraresearch.md:59`, `docs/qwen-diffusion-coding-model-ultraresearch.md:145`, `docs/qwen-diffusion-coding-model-ultraresearch.md:307`, `src/qiffusion/diffusion_data.py:25`, `src/qiffusion/diffusion_config.py`, `pyproject.toml`
@@ -104,7 +104,7 @@ Your next move: execute this plan through `$start-work`; no further product deci
   QA scenarios (name the exact tool + invocation): Happy command: `python -c "from pathlib import Path; from qiffusion.qwen_tokenizer import load_tokenizer; out=Path('.omo/evidence/qwen-diffusion-training-loop-plan-set/task-3-tokenizer.txt'); out.parent.mkdir(parents=True, exist_ok=True); out.write_text(str(load_tokenizer('byte').encode('def add')), encoding='utf-8')"` and assert stdout/artifact contains token ids. Failure command: `python -c "from pathlib import Path; from qiffusion.qwen_tokenizer import write_unavailable_probe; write_unavailable_probe('missing-local-qwen-tokenizer', Path('.omo/evidence/qwen-diffusion-training-loop-plan-set/task-3-tokenizer-failure.json'))"` and assert the artifact reports `status: unavailable` without installing `transformers`.
   Commit: Y | `feat(tokenizer): add qwen tokenizer adapter`
 
-- [ ] 4. Add Qwen diffusion config, compatibility contract, lineage, and benchmark gate schema.
+- [x] 4. Add Qwen diffusion config, compatibility contract, lineage, and benchmark gate schema.
   What to do / Must NOT do: Add a serializable config for Qwen diffusion runs: base checkpoint id, tokenizer id, attention mode, objective, sampler algorithm, mask schedule, block size, seed, data manifest id, checkpoint lineage, no-download Qwen compatibility contract, and resource probe output. The compatibility contract must record expected checkpoint family, tokenizer id, config fields, tensor-name mapping notes, and resource availability status without downloading weights. Add benchmark-gate metadata that marks benchmark datasets as eval-only. Do not add real training behavior here.
   Parallelization: Wave 1 | Blocked by: none | Blocks: 8, 10, 12
   References (executor has NO interview context - be exhaustive): `docs/qwen-diffusion-coding-model-ultraresearch.md:46`, `docs/qwen-diffusion-coding-model-ultraresearch.md:67`, `docs/qwen-diffusion-coding-model-ultraresearch.md:136`, `docs/qwen-diffusion-coding-model-ultraresearch.md:161`, `docs/qwen-diffusion-coding-model-ultraresearch.md:242`, `docs/qwen-diffusion-coding-model-ultraresearch.md:311`
