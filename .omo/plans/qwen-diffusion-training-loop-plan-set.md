@@ -178,13 +178,13 @@ Your next move: execute this plan through `$start-work`; no further product deci
 
 ## Final verification wave
 > Runs in parallel after ALL todos. ALL must APPROVE. Surface results and wait for the user's explicit okay before declaring complete.
-- [ ] F1. Plan compliance audit
+- [x] F1. Plan compliance audit
   Verify every todo acceptance criterion has matching evidence under `.omo/evidence/qwen-diffusion-training-loop-plan-set/`, every checked todo has a ledger entry, every requested commit exists, and no unresolved placeholder remains in this plan. Happy command: `python -m qiffusion.cli qwen-diffusion-plan-audit --plan .omo/plans/qwen-diffusion-training-loop-plan-set.md --ledger .omo/start-work/ledger.jsonl --evidence-root .omo/evidence/qwen-diffusion-training-loop-plan-set --out .omo/evidence/qwen-diffusion-training-loop-plan-set/f1-plan-compliance.json`. Failure command: rerun with `--require-all-checked` before all top-level boxes are checked and assert nonzero exit or `status: fail`.
-- [ ] F2. Code quality review
+- [x] F2. Code quality review
   Review final diff for overbroad abstractions, hidden fallback paths, benchmark contamination risks, missing provenance, weak tests, and stale ignored artifacts. Happy command: `python -m pytest && git diff --check && git status --short > .omo/evidence/qwen-diffusion-training-loop-plan-set/f2-git-status.txt`; reviewer writes findings to `.omo/evidence/qwen-diffusion-training-loop-plan-set/f2-code-review.md`. Failure command: `python -m qiffusion.cli qwen-diffusion-plan-audit --scan-fallback --evidence-root .omo/evidence/qwen-diffusion-training-loop-plan-set --out .omo/evidence/qwen-diffusion-training-loop-plan-set/f2-fallback-scan.json` and assert any fallback usage fails the review.
-- [ ] F3. Real manual QA
+- [x] F3. Real manual QA
   Run the actual CLI/data-artifact surface: manifest, tokenizer/config driver, tiny train, sample, eval, loop runner, and status gate. Happy command: `python -m qiffusion.cli qwen-diffusion-loop --manifest .omo/evidence/qwen-diffusion-training-loop-plan-set/task-9-data-loop.json --config .omo/evidence/qwen-diffusion-training-loop-plan-set/task-4-config.json --max-iterations 2 --ledger-out .omo/evidence/qwen-diffusion-training-loop-plan-set/f3-loop.jsonl && python -m qiffusion.cli status --report .omo/evidence/qwen-diffusion-training-loop-plan-set/task-12-passing-report.json > .omo/evidence/qwen-diffusion-training-loop-plan-set/f3-status.txt`; reviewer summarizes in `.omo/evidence/qwen-diffusion-training-loop-plan-set/f3-manual-qa.json`. Failure command: rerun the loop with `--force-eval-fail` and assert status does not become `complete`.
-- [ ] F4. Scope fidelity
+- [x] F4. Scope fidelity
   Confirm the delivered work preserves the Qwen-based diffusion architecture direction, does not claim unsupported capability, and leaves benchmark corpora held out. Happy command: `python -m qiffusion.cli qwen-diffusion-plan-audit --scope qwen-diffusion --plan .omo/plans/qwen-diffusion-training-loop-plan-set.md --evidence-root .omo/evidence/qwen-diffusion-training-loop-plan-set --out .omo/evidence/qwen-diffusion-training-loop-plan-set/f4-scope-fidelity.json`; reviewer writes final scope notes to `.omo/evidence/qwen-diffusion-training-loop-plan-set/f4-scope-fidelity.md`. Failure command: audit an evidence fixture with `fallback_used: true` or `usage: train_allowed` on a benchmark source and assert it fails.
 
 ## Commit strategy
