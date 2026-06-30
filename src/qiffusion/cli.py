@@ -12,6 +12,7 @@ from qiffusion.diffusion_corpus_manifest import MalformedTeacherJsonlError, Mani
 from qiffusion.diffusion_reports import diffusion_stub_report
 from qiffusion.diffusion_teacher_data import export_teacher_jsonl
 from qiffusion.qwen_bridge import DEFAULT_OLLAMA_MODEL, qwen_status
+from qiffusion.qwen_diffusion_chat_agent_cli import add_qwen_diffusion_chat_agent_parser, run_qwen_diffusion_chat_agent_validate
 from qiffusion.qwen_diffusion_data_loop_cli import add_qwen_diffusion_data_loop_parser, run_qwen_diffusion_data_loop
 from qiffusion.qwen_diffusion_loop_cli import add_qwen_diffusion_loop_parser, run_qwen_diffusion_loop_cli
 from qiffusion.qwen_eval import qwen_eval
@@ -88,6 +89,8 @@ def build_parser() -> argparse.ArgumentParser:
     qwen_diffusion_eval.add_argument("--runs", type=positive_int, default=1)
     qwen_diffusion_eval.add_argument("--seed", type=int, default=1)
     qwen_diffusion_eval.add_argument("--out", type=Path, required=True)
+
+    add_qwen_diffusion_chat_agent_parser(subcommands)
 
     diffusion_export = subcommands.add_parser("diffusion-export-teacher", help="Export passing Qwen task code to JSONL.")
     diffusion_export.add_argument("--qwen-report", type=Path, action="append", required=True)
@@ -245,6 +248,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(json.dumps(report, sort_keys=True))
             return 0
         raise argparse.ArgumentTypeError("qwen-diffusion-eval requires --validate-report or --checkpoint with --sample-out")
+    if args.command == "qwen-diffusion-chat-agent-validate":
+        return run_qwen_diffusion_chat_agent_validate(args.chat_json, args.tool_json, args.out)
     if args.command == "diffusion-export-teacher":
         count = export_teacher_jsonl(tuple(args.qwen_report), args.out)
         payload = {"status": "exported", "records": count, "out": str(args.out)}
