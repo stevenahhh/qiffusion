@@ -62,6 +62,16 @@ class ExtremeLogitDenoiser(nn.Module):
         return logits
 
 
+class AllInvalidLogitDenoiser(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.config = QwenDenoiserConfig.tiny(vocab_size=260, max_length=8)
+
+    def forward(self, input_ids: Tensor) -> Tensor:
+        batch_size, sequence_length = input_ids.shape
+        return torch.full((batch_size, sequence_length, self.config.vocab_size), -torch.inf)
+
+
 def test_qwen_mask_sampler_is_deterministic_with_seed() -> None:
     torch.manual_seed(1)
     model = TinyQwenTokenDenoiser(QwenDenoiserConfig.tiny(vocab_size=260, max_length=8))
@@ -87,6 +97,20 @@ def test_qwen_mask_sampler_never_selects_mask_as_replacement_token() -> None:
     assert all(entry["token_id"] != MASK_TOKEN_ID for entry in report["history"])
     assert all(MASK_TOKEN_ID not in entry["candidate_token_ids"] for entry in report["history"])
     assert report["early_stop"]["reason"] == "max_steps"
+
+
+@pytest.mark.parametrize("top_k", [2, 4, 7, 99])
+def test_qwen_mask_sampler_excludes_mask_from_all_invalid_top_k_candidates(top_k: int) -> None:
+    model = AllInvalidLogitDenoiser()
+    settings = QwenSamplerSettings(steps=1, seed=3, temperature=1.0, top_k=top_k)
+
+    report = sample_qwen_tokens(model, QwenMaskSampleConfig(prompt="", settings=settings))
+
+    entry = report["history"][0]
+    assert entry["token_id"] != MASK_TOKEN_ID
+    assert MASK_TOKEN_ID not in entry["candidate_token_ids"]
+    assert math.isfinite(entry["confidence"])
+    assert math.isfinite(entry["entropy"])
 
 
 def test_qwen_mask_sampler_records_finite_metadata_for_extreme_logits() -> None:

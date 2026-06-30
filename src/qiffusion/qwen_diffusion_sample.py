@@ -133,7 +133,7 @@ def sample_qwen_tokens(model: QwenTokenDenoiser, config: QwenMaskSampleConfig) -
                     "confidence": choice.confidence,
                     "entropy": choice.entropy,
                     "temperature": settings.temperature,
-                    "top_k": min(settings.top_k, model.config.vocab_size),
+                    "top_k": len(choice.candidate_token_ids),
                     "candidate_token_ids": choice.candidate_token_ids,
                 },
             )
@@ -203,7 +203,11 @@ def _choose_token(logits: Tensor, settings: QwenSamplerSettings, generator: torc
         neginf=-torch.inf,
     ).clone()
     scaled[MASK_TOKEN_ID] = -torch.inf
-    top_values, top_indices = torch.topk(scaled, k=min(settings.top_k, scaled.numel() - 1))
+    candidate_indices = torch.arange(scaled.numel(), device=scaled.device)
+    candidate_indices = candidate_indices[candidate_indices != MASK_TOKEN_ID]
+    candidate_values = scaled[candidate_indices]
+    top_values, top_positions = torch.topk(candidate_values, k=min(settings.top_k, candidate_values.numel()))
+    top_indices = candidate_indices[top_positions]
     probabilities = torch.softmax(top_values, dim=0)
     probabilities = torch.nan_to_num(probabilities, nan=0.0, posinf=0.0, neginf=0.0)
     probability_total = probabilities.sum()
