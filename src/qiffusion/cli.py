@@ -73,6 +73,14 @@ def build_parser() -> argparse.ArgumentParser:
     diffusion_eval.add_argument("--seed", type=int, default=1)
     diffusion_eval.add_argument("--out", type=Path)
 
+    qwen_diffusion_eval = subcommands.add_parser("qwen-diffusion-eval", help="Write or validate a Qwen diffusion eval report.")
+    qwen_diffusion_eval.add_argument("--checkpoint", type=Path)
+    qwen_diffusion_eval.add_argument("--sample-out", type=Path)
+    qwen_diffusion_eval.add_argument("--validate-report", type=Path)
+    qwen_diffusion_eval.add_argument("--runs", type=positive_int, default=1)
+    qwen_diffusion_eval.add_argument("--seed", type=int, default=1)
+    qwen_diffusion_eval.add_argument("--out", type=Path, required=True)
+
     diffusion_export = subcommands.add_parser("diffusion-export-teacher", help="Export passing Qwen task code to JSONL.")
     diffusion_export.add_argument("--qwen-report", type=Path, action="append", required=True)
     diffusion_export.add_argument("--out", type=Path, required=True)
@@ -183,6 +191,31 @@ def main(argv: Sequence[str] | None = None) -> int:
         write_json(args.report_out, report)
         print(json.dumps(report, sort_keys=True))
         return 0
+    if args.command == "qwen-diffusion-eval":
+        from qiffusion.qwen_diffusion_eval import (
+            QwenDiffusionEvalConfig,
+            eval_qwen_diffusion_checkpoint,
+            validate_report_file,
+        )
+
+        if args.validate_report is not None:
+            accepted = validate_report_file(args.validate_report, args.out)
+            payload = json.loads(args.out.read_text(encoding="utf-8"))
+            print(json.dumps(payload, sort_keys=True))
+            return 0 if accepted else 2
+        if args.checkpoint is not None and args.sample_out is not None:
+            report = eval_qwen_diffusion_checkpoint(
+                QwenDiffusionEvalConfig(
+                    checkpoint_path=args.checkpoint,
+                    sample_out=args.sample_out,
+                    runs=args.runs,
+                    seed=args.seed,
+                ),
+            )
+            write_json(args.out, report)
+            print(json.dumps(report, sort_keys=True))
+            return 0
+        raise argparse.ArgumentTypeError("qwen-diffusion-eval requires --validate-report or --checkpoint with --sample-out")
     if args.command == "diffusion-export-teacher":
         count = export_teacher_jsonl(tuple(args.qwen_report), args.out)
         payload = {"status": "exported", "records": count, "out": str(args.out)}
