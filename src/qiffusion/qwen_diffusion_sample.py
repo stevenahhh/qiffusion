@@ -196,9 +196,21 @@ def write_sampler_failure_probe(path: Path, algorithm: str) -> None:
 
 
 def _choose_token(logits: Tensor, settings: QwenSamplerSettings, generator: torch.Generator) -> TokenChoice:
-    scaled = logits / settings.temperature
-    top_values, top_indices = torch.topk(scaled, k=min(settings.top_k, scaled.numel()))
+    scaled = torch.nan_to_num(
+        logits / settings.temperature,
+        nan=-torch.inf,
+        posinf=torch.finfo(logits.dtype).max,
+        neginf=-torch.inf,
+    ).clone()
+    scaled[MASK_TOKEN_ID] = -torch.inf
+    top_values, top_indices = torch.topk(scaled, k=min(settings.top_k, scaled.numel() - 1))
     probabilities = torch.softmax(top_values, dim=0)
+    probabilities = torch.nan_to_num(probabilities, nan=0.0, posinf=0.0, neginf=0.0)
+    probability_total = probabilities.sum()
+    if (not bool(torch.isfinite(probability_total).item())) or float(probability_total.item()) <= 0.0:
+        probabilities = torch.full_like(probabilities, 1.0 / probabilities.numel())
+    else:
+        probabilities = probabilities / probability_total
     match _parse_algorithm(settings.algorithm):
         case "p2":
             selected_index = int(torch.multinomial(probabilities, num_samples=1, generator=generator).item())
@@ -207,7 +219,8 @@ def _choose_token(logits: Tensor, settings: QwenSamplerSettings, generator: torc
         case unreachable:
             assert_never(unreachable)
     selected_probability = float(probabilities[selected_index].item())
-    entropy = float(-(probabilities * torch.log(probabilities)).sum().item())
+    safe_probabilities = probabilities.clamp_min(torch.finfo(probabilities.dtype).tiny)
+    entropy = float(-(probabilities * torch.log(safe_probabilities)).sum().item())
     return TokenChoice(
         token_id=int(top_indices[selected_index].item()),
         confidence=selected_probability,
