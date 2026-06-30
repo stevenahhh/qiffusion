@@ -58,6 +58,14 @@ def build_parser() -> argparse.ArgumentParser:
     diffusion_train.add_argument("--max-examples", type=positive_int, default=24)
     diffusion_train.add_argument("--teacher-jsonl", type=Path, action="append", default=())
 
+    qwen_diffusion_train = subcommands.add_parser("qwen-diffusion-train", help="Run a tiny Qwen-token diffusion train smoke.")
+    qwen_diffusion_train.add_argument("--manifest", type=Path, required=True)
+    qwen_diffusion_train.add_argument("--tokenizer", required=True)
+    qwen_diffusion_train.add_argument("--steps", type=positive_int, default=2)
+    qwen_diffusion_train.add_argument("--seed", type=int, default=1)
+    qwen_diffusion_train.add_argument("--checkpoint-out", type=Path)
+    qwen_diffusion_train.add_argument("--report-out", type=Path, required=True)
+
     diffusion_sample = subcommands.add_parser("diffusion-sample", help="Write a non-claiming diffusion sample report.")
     diffusion_sample.add_argument("--report-out", type=Path)
     diffusion_sample.add_argument("--checkpoint", type=Path)
@@ -151,6 +159,32 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(json.dumps(report, sort_keys=True))
             return 0
         report = diffusion_stub_report("train")
+        write_json(args.report_out, report)
+        print(json.dumps(report, sort_keys=True))
+        return 0
+    if args.command == "qwen-diffusion-train":
+        from qiffusion.qwen_diffusion_train import (
+            QwenDiffusionTrainConfig,
+            TrainingDataBlockedError,
+            blocked_report,
+            train_qwen_diffusion,
+        )
+
+        try:
+            report = train_qwen_diffusion(
+                QwenDiffusionTrainConfig(
+                    manifest_path=args.manifest,
+                    checkpoint_path=args.checkpoint_out or args.report_out.with_suffix(".pt"),
+                    tokenizer_id=args.tokenizer,
+                    steps=args.steps,
+                    seed=args.seed,
+                )
+            )
+        except TrainingDataBlockedError as error:
+            blocked = blocked_report(error)
+            write_json(args.report_out, blocked)
+            print(json.dumps(blocked, sort_keys=True))
+            return 2
         write_json(args.report_out, report)
         print(json.dumps(report, sort_keys=True))
         return 0
