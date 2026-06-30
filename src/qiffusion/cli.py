@@ -8,16 +8,12 @@ from typing import Sequence, TypeAlias
 from qiffusion.backends import diffusion_status
 from qiffusion.config import CODING_CAPABLE_REQUIREMENTS, TRACKS
 from qiffusion.decision import decide_from_file
-from qiffusion.diffusion_corpus_manifest import (
-    MalformedTeacherJsonlError,
-    ManifestBuildConfig,
-    write_manifest,
-    write_manifest_error,
-)
+from qiffusion.diffusion_corpus_manifest import MalformedTeacherJsonlError, ManifestBuildConfig, write_manifest, write_manifest_error
 from qiffusion.diffusion_reports import diffusion_stub_report
 from qiffusion.diffusion_teacher_data import export_teacher_jsonl
 from qiffusion.qwen_bridge import DEFAULT_OLLAMA_MODEL, qwen_status
 from qiffusion.qwen_diffusion_data_loop_cli import add_qwen_diffusion_data_loop_parser, run_qwen_diffusion_data_loop
+from qiffusion.qwen_diffusion_loop_cli import add_qwen_diffusion_loop_parser, run_qwen_diffusion_loop_cli
 from qiffusion.qwen_eval import qwen_eval
 
 JsonValue: TypeAlias = str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
@@ -68,6 +64,7 @@ def build_parser() -> argparse.ArgumentParser:
     qwen_diffusion_train.add_argument("--report-out", type=Path, required=True)
 
     add_qwen_diffusion_data_loop_parser(subcommands)
+    add_qwen_diffusion_loop_parser(subcommands)
 
     diffusion_sample = subcommands.add_parser("diffusion-sample", help="Write a non-claiming diffusion sample report.")
     diffusion_sample.add_argument("--report-out", type=Path)
@@ -166,12 +163,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps(report, sort_keys=True))
         return 0
     if args.command == "qwen-diffusion-train":
-        from qiffusion.qwen_diffusion_train import (
-            QwenDiffusionTrainConfig,
-            TrainingDataBlockedError,
-            blocked_report,
-            train_qwen_diffusion,
-        )
+        from qiffusion.qwen_diffusion_train import QwenDiffusionTrainConfig, TrainingDataBlockedError, blocked_report, train_qwen_diffusion
 
         try:
             report = train_qwen_diffusion(
@@ -193,6 +185,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if args.command == "qwen-diffusion-data-loop":
         return run_qwen_diffusion_data_loop(tuple(args.teacher_jsonl), args.manifest, args.out)
+    if args.command == "qwen-diffusion-loop":
+        return run_qwen_diffusion_loop_cli(args)
     if args.command == "diffusion-sample":
         if args.checkpoint is not None and args.out is not None:
             from qiffusion.diffusion_sample import DiffusionSampleConfig, sample_from_checkpoint
@@ -231,11 +225,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps(report, sort_keys=True))
         return 0
     if args.command == "qwen-diffusion-eval":
-        from qiffusion.qwen_diffusion_eval import (
-            QwenDiffusionEvalConfig,
-            eval_qwen_diffusion_checkpoint,
-            validate_report_file,
-        )
+        from qiffusion.qwen_diffusion_eval import QwenDiffusionEvalConfig, eval_qwen_diffusion_checkpoint, validate_report_file
 
         if args.validate_report is not None:
             accepted = validate_report_file(args.validate_report, args.out)
