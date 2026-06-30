@@ -87,9 +87,9 @@ def test_plan_audit_require_all_checked_fails_for_unchecked_top_level_item(tmp_p
     assert payload["unchecked_top_level"] == ["F1. Plan compliance audit"]
 
 
-def test_fallback_scan_fails_hidden_fallback_evidence(tmp_path: Path) -> None:
+def test_fallback_scan_fails_hidden_fallback_filename_evidence(tmp_path: Path) -> None:
     out = tmp_path / "fallback-scan.json"
-    (tmp_path / "hidden.json").write_text('{"fallback_used": true}\n', encoding="utf-8")
+    (tmp_path / "hidden-fallback.json").write_text('{"fallback_used": true}\n', encoding="utf-8")
 
     exit_code = main(["qwen-diffusion-plan-audit", "--scan-fallback", "--evidence-root", str(tmp_path), "--out", str(out)])
 

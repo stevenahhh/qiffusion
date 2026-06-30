@@ -13,8 +13,10 @@ JsonObject: TypeAlias = dict[str, JsonValue]
 
 CHECKED_TODO_RE: Final = re.compile(r"^- \[[xX]\] (?P<number>\d+)\. (?P<title>.+)$")
 UNCHECKED_RE: Final = re.compile(r"^- \[ \] (?P<label>(?:\d+|F\d+)\. .+)$")
-FAILURE_NAME_MARKERS: Final = ("failure", "fallback", "blocked", "overclaim", "mismatch", "invalid", "malformed", "rejected")
 BENCHMARK_MARKERS: Final = ("humaneval", "mbpp", "evalplus", "livecodebench", "bigcodebench", "swe-bench", "swebench")
+EXPECTED_FAILURE_FIXTURE_PATH_SUFFIXES: Final[tuple[tuple[str, ...], ...]] = (
+    (".omo", "evidence", "qwen-diffusion-training-loop-plan-set", "task-12-fallback-report.json"),
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -292,8 +294,8 @@ def _scope_confirmed(plan: Path | None, documents: tuple[EvidenceDocument, ...])
 
 
 def _expected_failure_fixture(path: Path) -> bool:
-    lowered = path.name.lower()
-    return any(marker in lowered for marker in FAILURE_NAME_MARKERS)
+    parts = path.parts
+    return any(parts[-len(suffix) :] == suffix for suffix in EXPECTED_FAILURE_FIXTURE_PATH_SUFFIXES)
 
 
 def _write_report(path: Path, report: JsonObject) -> int:
