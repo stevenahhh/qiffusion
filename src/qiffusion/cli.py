@@ -66,6 +66,11 @@ def build_parser() -> argparse.ArgumentParser:
     qwen_diffusion_train.add_argument("--checkpoint-out", type=Path)
     qwen_diffusion_train.add_argument("--report-out", type=Path, required=True)
 
+    qwen_data_loop = subcommands.add_parser("qwen-diffusion-data-loop", help="Write filtered Qwen diffusion training data manifest.")
+    qwen_data_loop.add_argument("--teacher-jsonl", type=Path, action="append", required=True)
+    qwen_data_loop.add_argument("--manifest", type=Path, required=True)
+    qwen_data_loop.add_argument("--out", type=Path, required=True)
+
     diffusion_sample = subcommands.add_parser("diffusion-sample", help="Write a non-claiming diffusion sample report.")
     diffusion_sample.add_argument("--report-out", type=Path)
     diffusion_sample.add_argument("--checkpoint", type=Path)
@@ -187,6 +192,28 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 2
         write_json(args.report_out, report)
         print(json.dumps(report, sort_keys=True))
+        return 0
+    if args.command == "qwen-diffusion-data-loop":
+        from qiffusion.qwen_diffusion_data_loop import (
+            DataLoopBlockedError,
+            QwenDataLoopConfig,
+            write_blocked_report,
+            write_data_loop_manifest,
+        )
+
+        try:
+            report = write_data_loop_manifest(
+                QwenDataLoopConfig(
+                    teacher_jsonl_paths=tuple(args.teacher_jsonl),
+                    manifest_path=args.manifest,
+                    output_path=args.out,
+                )
+            )
+        except DataLoopBlockedError as error:
+            blocked = write_blocked_report(error)
+            print(json.dumps(blocked, sort_keys=True))
+            return 2
+        print(json.dumps({"status": report["status"], "records": len(report["records"]), "out": str(args.out)}, sort_keys=True))
         return 0
     if args.command == "diffusion-sample":
         if args.checkpoint is not None and args.out is not None:
