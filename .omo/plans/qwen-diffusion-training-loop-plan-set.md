@@ -144,7 +144,7 @@ Your next move: execute this plan through `$start-work`; no further product deci
   QA scenarios (name the exact tool + invocation): Happy command: `python -m qiffusion.cli qwen-diffusion-eval --checkpoint .omo/evidence/qwen-diffusion-training-loop-plan-set/task-7-tiny.pt --sample-out .omo/evidence/qwen-diffusion-training-loop-plan-set/task-8-sample.json --out .omo/evidence/qwen-diffusion-training-loop-plan-set/task-8-eval.json --runs 1` and assert separate code/chat/tool/software-engineering bucket statuses. Failure command: `python -m qiffusion.cli qwen-diffusion-eval --validate-report .omo/evidence/qwen-diffusion-training-loop-plan-set/task-8-overclaim-input.json --out .omo/evidence/qwen-diffusion-training-loop-plan-set/task-8-overclaim-failure.json` and assert overclaim rejection.
   Commit: Y | `feat(eval): split qwen diffusion capability gates`
 
-- [ ] 9. Add data improvement loop inputs from teacher traces and execution feedback.
+- [x] 9. Add data improvement loop inputs from teacher traces and execution feedback.
   What to do / Must NOT do: Add quality-filtered ingestion from teacher traces, local repair examples, and execution pass/fail records into manifest-approved training splits. Do not ingest benchmark eval splits or raw user chat logs.
   Parallelization: Wave 3 | Blocked by: 1, 2, 7 | Blocks: 10, 11
   References (executor has NO interview context - be exhaustive): `docs/qwen-diffusion-coding-model-ultraresearch.md:85`, `docs/qwen-diffusion-coding-model-ultraresearch.md:91`, `docs/qwen-diffusion-coding-model-ultraresearch.md:116`, `docs/qwen-diffusion-coding-model-ultraresearch.md:303`, `src/qiffusion/diffusion_teacher_data.py:50`, `src/qiffusion/qwen_tasks.py`
