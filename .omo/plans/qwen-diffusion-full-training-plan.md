@@ -54,7 +54,11 @@ Your next move: <fill - e.g. approve, or run a high-accuracy review>. Full execu
 - [ ] F2. Code quality review
 - [ ] F3. Real manual QA
 - [ ] F4. Scope fidelity
+- [ ] F5. Sonnet 4.6 target-matrix audit: overall completion is rejected unless the trained diffusion model reaches the recorded Sonnet 4.6-level coding, agentic, long-context, and speed/quality gates.
 
 ## Commit strategy
 
 ## Success criteria
+- The loop can only be marked fully complete when the final trained Qwen-based diffusion model reaches the Claude Sonnet 4.6-level target matrix recorded in `.omo/ulw-research/20260701-full-training-plan/wave-2-librarian-sonnet-target.md`.
+- Partial gains, local smoke passes, loss reductions, faster token emission, or isolated benchmark wins are progress only; they must keep the loop in `continue` until the full target matrix passes.
+- Any final status report must include evidence for coding, multi-turn chat, tool/agent, SWE-bench-style repo repair, Terminal-Bench-style terminal work, OSWorld/computer-use-adjacent tasks, long-context behavior, safety, and speed/quality Pareto gates.

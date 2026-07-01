@@ -8,7 +8,7 @@ The strongest plan is not to keep stretching the current tiny smoke trainer. qif
 
 The first full-training objective should be DiffuLLaMA-style AR-to-diffusion adaptation from Qwen/Qwen3.5-4B, with LLaDA-style masked remasking as the simplest sampler. Dream, DiffusionGemma, BD3LM, and DiffuCoder/coupled-GRPO are later extensions, not the first implementation branch.
 
-Claude Sonnet 4.6-level performance is a final benchmark target, not a near-term local claim. The claim gate should include SWE-bench Verified, Terminal-Bench 2.0, OSWorld-Verified, long-context, multi-turn agent, tool-use, coding, safety, and speed/quality Pareto checks. Local 8GB hardware can support prototypes and quantized baselines, not the full claim.
+Claude Sonnet 4.6-level performance is the required final-complete gate, not a near-term local claim. The learning loop remains open until the trained diffusion model reaches the target matrix: SWE-bench Verified, Terminal-Bench 2.0, OSWorld-Verified, long-context, multi-turn agent, tool-use, coding, safety, and speed/quality Pareto checks. Local 8GB hardware can support prototypes and quantized baselines, not the full claim.
 
 ## Findings By Theme
 
@@ -52,7 +52,7 @@ Before large-scale code benchmarks or broad teacher-data ingestion, qiffusion ne
 ## Contradictions Resolved
 
 - "Use full actual training now" conflicts with the repo state. The current code has only tiny smoke training, so the plan must first build full-training infrastructure.
-- "Sonnet 4.6 level" conflicts with local hardware and current capability evidence. The plan keeps it as a final gate and makes intermediate stages fail closed.
+- "Sonnet 4.6 level" conflicts with local hardware and current capability evidence. The plan keeps it as the required final-complete gate and makes intermediate stages fail closed.
 - "Perfect dataset" is not a single corpus. The defensible answer is a repeated dataset discovery, compliance, decontamination, train, eval, error-bucket, and remix loop.
 
 ## Expansion Trace

@@ -3,7 +3,7 @@ slug: qwen-diffusion-full-training-plan
 status: awaiting-approval
 intent: unclear
 pending-action: write .omo/plans/qwen-diffusion-full-training-plan.md
-approach: Build a full Qwen/Qwen3.5-4B diffusion training plan in stages: source-ledger and contamination gates, sandboxed eval, Qwen AR-to-diffusion conversion, dataset iteration loop, SFT/preference/RL stages, cloud-scale full training gates, and Sonnet-4.6-style final claim gates.
+approach: Build a full Qwen/Qwen3.5-4B diffusion training plan in stages: source-ledger and contamination gates, sandboxed eval, Qwen AR-to-diffusion conversion, dataset iteration loop, SFT/preference/RL stages, cloud-scale full training gates, and a hard final-complete gate requiring Claude Sonnet 4.6-level benchmark performance.
 ---
 
 # Draft: qwen-diffusion-full-training-plan
@@ -15,7 +15,7 @@ approach: Build a full Qwen/Qwen3.5-4B diffusion training plan in stages: source
 | C2 | Contamination and sandbox harness prevents false coding/agent capability claims | active | .omo/ulw-research/20260701-full-training-plan/wave-2-explorer-sandbox-contamination.md |
 | C3 | Qwen/Qwen3.5-4B AR-to-diffusion adaptation replaces the current tiny smoke-only trainer | active | .omo/ulw-research/20260701-full-training-plan/wave-2-librarian-objective-choice.md |
 | C4 | Multi-stage data loop selects, filters, trains, evaluates, and remixes code/chat/agent/preference data | active | .omo/ulw-research/20260701-full-training-plan/wave-1-librarian-coding-data.md; .omo/ulw-research/20260701-full-training-plan/wave-1-librarian-chat-agent-data.md |
-| C5 | Benchmark and claim gates map progress to local smoke, code, chat, tool-agent, SWE-bench, Terminal-Bench, OSWorld, and long-context targets | active | .omo/ulw-research/20260701-full-training-plan/wave-2-librarian-sonnet-target.md |
+| C5 | Benchmark and claim gates keep the loop open until local smoke, code, chat, tool-agent, SWE-bench, Terminal-Bench, OSWorld, long-context, and Sonnet 4.6-level targets pass | active | .omo/ulw-research/20260701-full-training-plan/wave-2-librarian-sonnet-target.md |
 | C6 | Full-training infrastructure separates local prototypes from approved cloud-scale training and checkpoint promotion | active | .omo/ulw-research/20260701-full-training-plan/wave-1-librarian-hyperparams.md; .omo/ulw-research/20260701-full-training-plan/wave-1-metis-risk-ledger.md |
 
 ## Open assumptions (announced defaults)
@@ -27,7 +27,7 @@ approach: Build a full Qwen/Qwen3.5-4B diffusion training plan in stages: source
 | Dataset policy | REVIEW/BLOCK sources cannot enter training manifests | Prevents license/privacy/benchmark leakage from becoming irreversible | yes |
 | Benchmark policy | HumanEval/MBPP/EvalPlus/BigCodeBench/LiveCodeBench/SWE-bench/tau-bench/BFCL/WebArena test splits are eval-only | Avoids contaminated capability claims | yes |
 | Paid/cloud budget | No paid APIs, cloud GPUs, large gated downloads, or commercial-use gray data without a separate approval gate | Full Sonnet-level training needs owner approval for spend and terms | yes |
-| Capability claim | Keep `coding_capability_claim=false` and no Sonnet-level claim until final gates pass | Current repo evidence is smoke-only; overclaiming is the main failure mode | yes |
+| Capability claim | Keep `coding_capability_claim=false`, no Sonnet-level claim, and no overall-complete status until the Sonnet 4.6 target matrix passes | Current repo evidence is smoke-only; overclaiming is the main failure mode | yes |
 | Local machine role | Use local 8GB hardware for prototype, schema, quantized baseline, and eval harness only | Not enough for full 4B full-parameter training or Sonnet-level validation | yes |
 
 ## Findings (cited - path:lines)
@@ -46,6 +46,7 @@ approach: Build a full Qwen/Qwen3.5-4B diffusion training plan in stages: source
 - The first model architecture wave must adapt Qwen/Qwen3.5-4B into diffusion rather than continuing the current tiny smoke model.
 - The data loop must repeatedly discover datasets, classify policy status, decontaminate, sample/train, evaluate, error-bucket failures, and update mixture weights.
 - Final quality gates must compare against benchmark families and task distributions, not against subjective "feels like Sonnet" judgments.
+- The training loop is not overall complete until it reaches Claude Sonnet 4.6-level gates; any lower result remains `continue` or `blocked`, never `complete`.
 
 ## Scope IN
 - Full training plan for Qwen/Qwen3.5-4B-based diffusion LLM.
@@ -53,7 +54,7 @@ approach: Build a full Qwen/Qwen3.5-4B diffusion training plan in stages: source
 - Coding, multi-turn chat, tool/agent, preference, safety, and long-context training/eval lanes.
 - Qwen AR-to-diffusion adaptation path and later sampler/post-training improvements.
 - Local prototype gates and cloud-scale full-training gates.
-- Benchmark matrix that can eventually justify or reject Sonnet 4.6-level claims.
+- Benchmark matrix that defines final completion as Claude Sonnet 4.6-level performance, not merely an aspirational comparison.
 
 ## Scope OUT (Must NOT have)
 - No claim that the current qiffusion model is coding/chat capable.
@@ -62,6 +63,7 @@ approach: Build a full Qwen/Qwen3.5-4B diffusion training plan in stages: source
 - No use of REVIEW/BLOCK datasets in training manifests.
 - No paid API/cloud/gated dataset download as part of this planning turn.
 - No implementation or full training run in this planning turn.
+- No "overall complete" status for the learning loop before the Sonnet 4.6 target matrix passes.
 
 ## Open questions
 - None blocking the plan. Budget, cloud provider, and gated-data approvals are deferred as explicit execution gates, not planner questions.

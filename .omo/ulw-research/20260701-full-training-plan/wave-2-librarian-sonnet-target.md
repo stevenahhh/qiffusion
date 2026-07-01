@@ -22,5 +22,6 @@
 
 ## Planning Implications
 
-- These numbers become final claim gates, not near-term local training targets.
+- These numbers become final-complete gates, not near-term local training targets.
+- The learning loop is not done until a trained Qwen-based diffusion model reaches this target matrix.
 - Speed claims must include quality gates; raw generated tokens per second alone is not enough.
